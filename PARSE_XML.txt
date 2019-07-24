@@ -1,0 +1,110 @@
+  METHOD parse_xml_msg.
+
+    DATA: ls_msg_info     TYPE cuan_digacc_msgs,
+          ls_msg_data     TYPE cuan_s_digacc_event,
+          lt_delete_key   TYPE /bobf/t_frw_key,
+          ls_key          TYPE /bobf/s_frw_key,
+          lv_xstring      TYPE xstring,
+          ls_data         TYPE srt_xml_data,
+          lb_badi_filter  TYPE REF TO cuan_wechat_msg_filter,
+          ls_msg          TYPE bal_s_msg,
+          lv_msg          TYPE c,
+          lv_lines        TYPE i,
+          lv_str          TYPE string,
+          lv_timestamp    TYPE timestamp,
+          lt_event_filter TYPE cuan_t_wechat_event_type,
+          ls_event_filter TYPE cuan_s_wechat_event_type,
+          lv_count        TYPE string.
+
+    CHECK it_msg_info IS NOT INITIAL.
+
+    CLEAR: et_msg_data, lt_delete_key, lt_event_filter.
+
+    lt_event_filter = get_event_filter_list( ).
+
+*   Create filter BADi.
+    TRY .
+        GET BADI lb_badi_filter.
+      CATCH cx_badi_not_implemented.
+        CLEAR lb_badi_filter.
+    ENDTRY.
+
+*   call badi to add/remove supported event types to/from default supported WeChat event types
+    IF lb_badi_filter IS BOUND.
+      TRY.
+          CALL BADI lb_badi_filter->adapt_event_filter_list
+            CHANGING
+              wechat_filters = lt_event_filter.
+        CATCH cx_ble_runtime_error.
+      ENDTRY.
+    ENDIF.
+
+* do parse.
+    LOOP AT it_msg_info INTO ls_msg_info.
+      CLEAR: ls_msg_data, ls_key, lv_xstring.
+
+* convert string to xstring
+      TRY .
+          CALL TRANSFORMATION id SOURCE XML ls_msg_info-content RESULT XML lv_xstring.
+        CATCH cx_xslt_runtime_error.
+          CONTINUE.
+      ENDTRY.
+
+*parse xstring to table
+      cl_soap_xml_parser=>get_data(
+        EXPORTING
+          xdoc       = lv_xstring
+        IMPORTING
+          data       = ls_msg_data-data
+          error_text = DATA(lv_error_text) ).
+
+* convert data to uppercase
+      LOOP AT ls_msg_data-data INTO ls_data.
+        TRANSLATE ls_data-tag_name TO UPPER CASE.
+        IF ls_data-tag_name = if_cuan_wechat_constant=>sc_field_name-to_user_name OR
+           ls_data-tag_name = if_cuan_wechat_constant=>sc_field_name-from_user_name OR
+           ls_data-tag_name  = if_cuan_wechat_constant=>sc_field_name-content."'FromUserName'.
+        ELSE.
+          TRANSLATE ls_data-tag_value TO UPPER CASE.
+        ENDIF.
+        CASE ls_data-tag_name.
+          WHEN if_cuan_wechat_constant=>sc_field_name-msg_type." 'MSGTYPE'.
+            ls_msg_data-msg_type = ls_data-tag_value.
+          WHEN if_cuan_wechat_constant=>sc_field_name-msg_event."'EVENT'.
+            ls_msg_data-event = ls_data-tag_value.
+          WHEN if_cuan_wechat_constant=>sc_field_name-from_user_name."'FROMUSERNAME'.
+            ls_msg_data-id = ls_data-tag_value.
+          WHEN 'TOUSERNAME'.
+          WHEN 'CONTENT'.
+            ls_msg_data-text = ls_data-tag_value.
+          WHEN 'CREATETIME'.
+            CALL METHOD me->convert_time
+              EXPORTING
+                iv_secs      =  ls_data-tag_value
+              IMPORTING
+                ev_timestemp = lv_timestamp.
+            ls_data-tag_value = lv_timestamp.
+            ls_msg_data-timestamp = ls_data-tag_value.
+          WHEN OTHERS.
+        ENDCASE.
+        MODIFY ls_msg_data-data FROM ls_data.
+      ENDLOOP.
+      ls_msg_data-db_key = ls_msg_info-db_key.
+      ls_msg_data-da_key = ls_msg_info-da_key.
+* check implementation event
+      READ TABLE lt_event_filter INTO ls_event_filter WITH KEY msg_type = ls_msg_data-msg_type event = ls_msg_data-event.
+      IF sy-subrc <> 0.
+        CONTINUE.
+      ENDIF.
+      APPEND ls_msg_data TO et_msg_data.
+    ENDLOOP.
+
+    IF et_msg_data IS NOT INITIAL.
+      CLEAR:lv_count,lv_lines.
+      DESCRIBE TABLE et_msg_data LINES lv_lines.
+      lv_count = lv_lines.
+      APPEND VALUE #( msgty  = 'I'  msgid = 'CM_CUAN_DA' msgno = 062  msgv1 = 'WeChat' msgv2 = lv_count ) TO if_cuan_ntwrk_message_process~mt_message.
+    ENDIF.
+
+
+  ENDMETHOD.

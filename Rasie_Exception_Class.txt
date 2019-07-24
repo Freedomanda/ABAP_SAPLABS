@@ -1,0 +1,121 @@
+  
+Read Baidu Account token from communication arrangement
+
+IV_CS_ID	TYPE STRING	Communication Scenario ID
+EV_TOKEN	TYPE STRING	Token
+EV_PATH	TYPE STRING	Path
+EV_HOST	TYPE STRING	Host
+/IWBEP/CX_MGW_BUSI_EXCEPTION		WeChat message process error
+
+
+METHOD read_ca.
+
+    DATA:lo_api     TYPE REF TO object,
+         lo_ca      TYPE REF TO data,
+         lv_cs_id   TYPE char30,
+         lv_ca_uuid TYPE uuid,
+         ptab       TYPE abap_parmbind_tab,
+         ptab_line  TYPE abap_parmbind,
+         lv_message TYPE string.
+
+    FIELD-SYMBOLS:<fs_ca_data>   TYPE ANY TABLE,
+                  <fs_ca_uuid>   TYPE any,
+                  <fs_cs_struc>  TYPE any,
+                  <fs_ot_struc>  TYPE any,
+                  <fs_api_struc> TYPE any,
+                  <fs_ot_table>  TYPE ANY TABLE,
+                  <fs_api_table> TYPE ANY TABLE,
+                  <fs_host>      TYPE any,
+                  <fs_path>      TYPE any,
+                  <fs_token>     TYPE any.
+
+    lv_cs_id = iv_cs_id.
+*dynamic calling CA API to fetch the
+    TRY .
+        CREATE DATA lo_ca TYPE (ov_ca_type). "'IF_APS_CA_EXTERNAL_API=>TT_CA_DATA').
+      CATCH cx_sy_create_data_error.
+    ENDTRY.
+    IF lo_ca IS NOT INITIAL.
+      ASSIGN lo_ca->* TO <fs_ca_data>.
+    ENDIF.
+    ptab_line-name  = 'IV_COMM_SCENARIO_ID'.
+    ptab_line-kind  = cl_abap_objectdescr=>exporting.
+    ptab_line-value = REF #( lv_cs_id ) .
+    INSERT ptab_line INTO TABLE ptab.
+
+    ptab_line-name  = 'ET_CA_DATA'.
+    ptab_line-kind  = cl_abap_objectdescr=>importing.
+    IF <fs_ca_data> IS ASSIGNED.
+      ptab_line-value = REF #( <fs_ca_data> ).
+    ENDIF.
+    INSERT ptab_line INTO TABLE ptab.
+
+    TRY.
+        CREATE OBJECT lo_api TYPE ('CL_CUAN_CA_DATA_PROV').
+      CATCH cx_sy_create_object_error.
+    ENDTRY.
+
+    TRY.
+        CALL METHOD lo_api->('QUERY_CA')
+          PARAMETER-TABLE ptab.
+      CATCH cx_sy_ref_is_initial.
+    ENDTRY.
+
+    IF <fs_ca_data> IS ASSIGNED.
+      LOOP AT <fs_ca_data> ASSIGNING FIELD-SYMBOL(<fs_ca_line>).
+        ASSIGN COMPONENT 'UUID' OF STRUCTURE <fs_ca_line> TO <fs_ca_uuid>.
+        IF <fs_ca_uuid> IS ASSIGNED.
+          ov_ca_uuid = <fs_ca_uuid>.
+        ENDIF.
+      ENDLOOP.
+    ENDIF.
+
+    CLEAR:ptab[],ptab_line.
+    IF ov_ca_uuid IS NOT INITIAL.
+      lv_ca_uuid = ov_ca_uuid.
+    ELSE.
+      MESSAGE e065(cuan_wechat) WITH iv_cs_id INTO lv_message.
+      RAISE EXCEPTION TYPE /iwbep/cx_mgw_busi_exception
+        EXPORTING
+          textid            = /iwbep/cx_mgw_busi_exception=>business_error_unlimited
+          message_unlimited = lv_message.
+    ENDIF.
+    ptab_line-name  = 'IV_CA_UUID'.
+    ptab_line-kind  = cl_abap_objectdescr=>exporting.
+    ptab_line-value = REF #( lv_ca_uuid ) .
+    INSERT ptab_line INTO TABLE ptab.
+
+    TRY.
+        CALL METHOD lo_api->('READ_CA')
+          PARAMETER-TABLE ptab.
+      CATCH cx_sy_ref_is_initial.
+    ENDTRY.
+
+    ASSIGN ('LO_API->MS_CS_DATA')  TO <fs_cs_struc>.
+    ASSIGN COMPONENT 'HOSTNAME' OF STRUCTURE <fs_cs_struc> TO <fs_host>.
+    ASSIGN ('LO_API->MT_OUTBOUND') TO <fs_ot_table>.
+    ASSIGN ('LO_API->MT_APIKEY')   TO <fs_api_table>.
+
+    IF <fs_ot_table> IS ASSIGNED.
+      LOOP AT <fs_ot_table> ASSIGNING <fs_ot_struc>.
+        ASSIGN COMPONENT 'URL_PATH' OF STRUCTURE <fs_ot_struc> TO <fs_path>.
+      ENDLOOP.
+    ENDIF.
+
+    IF <fs_api_table> IS ASSIGNED.
+      LOOP AT <fs_api_table> ASSIGNING <fs_api_struc>.
+        ASSIGN COMPONENT 'INTERFACEKEYVALUE' OF STRUCTURE <fs_api_struc> TO <fs_token>.
+      ENDLOOP.
+    ENDIF.
+
+    IF <fs_host> IS ASSIGNED.
+      ev_host = <fs_host>.
+    ENDIF.
+    IF <fs_token> IS ASSIGNED.
+      ev_token = <fs_token>.
+    ENDIF.
+    IF <fs_path> IS ASSIGNED.
+      ev_path = <fs_path>.
+    ENDIF.
+
+  ENDMETHOD.

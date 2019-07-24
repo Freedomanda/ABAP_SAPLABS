@@ -1,0 +1,149 @@
+  METHOD parse_xml_msg.
+
+    DATA: ls_msg_info     TYPE cuan_s_wechat_msgs,
+          ls_msg_data     TYPE cuan_s_wechat_event,
+          lt_delete_key   TYPE /bobf/t_frw_key,
+          ls_key          TYPE /bobf/s_frw_key,
+          lv_xstring      TYPE xstring,
+          ls_data         TYPE srt_xml_data,
+          lb_badi_filter  TYPE REF TO cuan_wechat_msg_filter,
+          ls_msg          TYPE bal_s_msg,
+          lv_msg          TYPE c,
+          lv_lines        TYPE i,
+          lv_str          TYPE string,
+          lt_event_filter TYPE cuan_t_wechat_event_type,
+          ls_event_filter TYPE cuan_s_wechat_event_type.
+
+    CHECK it_msg_info IS NOT INITIAL.
+
+    CLEAR: et_msg_data, lt_delete_key, lt_event_filter.
+
+* add log
+    MESSAGE i011(cuan_wechat) INTO lv_msg.
+    mo_log->msg_add( iv_probclass = cl_cuan_wechat_log=>con_probclass_low ).
+
+    lt_event_filter = get_event_filter_list( ).
+
+*   Create filter BADi.
+    TRY .
+        GET BADI lb_badi_filter.
+      CATCH cx_badi_not_implemented.
+        CLEAR lb_badi_filter.
+    ENDTRY.
+
+*   call badi to add/remove supported event types to/from default supported WeChat event types
+    IF lb_badi_filter IS BOUND.
+      TRY.
+          CALL BADI lb_badi_filter->adapt_event_filter_list
+            CHANGING
+              wechat_filters = lt_event_filter.
+        CATCH cx_ble_runtime_error.
+      ENDTRY.
+    ENDIF.
+
+* do parse.
+    LOOP AT it_msg_info INTO ls_msg_info.
+      CLEAR: ls_msg_data, ls_key, lv_xstring.
+
+* check content.
+      IF ls_msg_info-content IS INITIAL.
+        ls_key-key = ls_msg_info-db_key.
+        APPEND ls_key TO lt_delete_key.
+        MESSAGE e007(cuan_wechat) WITH ls_key-key INTO lv_msg.
+        mo_log->msg_add( iv_probclass = cl_cuan_wechat_log=>con_probclass_very_high ).
+        CONTINUE.
+      ENDIF.
+
+* convert string to xstring
+      TRY .
+          CALL TRANSFORMATION id SOURCE XML ls_msg_info-content RESULT XML lv_xstring.
+        CATCH cx_xslt_runtime_error.
+"invalid format
+          ls_key-key = ls_msg_info-db_key.
+          APPEND ls_key TO lt_delete_key.
+          MESSAGE e044(cuan_wechat) WITH ls_key-key INTO lv_msg.
+          mo_log->msg_add( iv_probclass = cl_cuan_wechat_log=>con_probclass_very_high ).
+          CONTINUE.
+      ENDTRY.
+
+*parse xstring to table
+      cl_soap_xml_parser=>get_data(
+        EXPORTING
+          xdoc       = lv_xstring
+        IMPORTING
+          data       = ls_msg_data-data
+          error_text = DATA(lv_error_text) ).
+
+* convert data to uppercase
+      LOOP AT ls_msg_data-data INTO ls_data.
+        TRANSLATE ls_data-tag_name TO UPPER CASE.
+        IF ls_data-tag_name = if_cuan_wechat_constant=>sc_field_name-to_user_name OR
+           ls_data-tag_name = if_cuan_wechat_constant=>sc_field_name-from_user_name OR
+           ls_data-tag_name  = if_cuan_wechat_constant=>sc_field_name-content."'FromUserName'.
+        ELSE.
+          TRANSLATE ls_data-tag_value TO UPPER CASE.
+        ENDIF.
+* store message type
+        IF ls_data-tag_name = if_cuan_wechat_constant=>sc_field_name-msg_type." 'MSGTYPE'.
+          ls_msg_data-msg_type = ls_data-tag_value.
+        ENDIF.
+* store event
+        IF ls_data-tag_name = if_cuan_wechat_constant=>sc_field_name-msg_event."'EVENT'.
+          ls_msg_data-event = ls_data-tag_value.
+        ENDIF.
+* store openid
+        IF ls_data-tag_name = if_cuan_wechat_constant=>sc_field_name-from_user_name."'FROMUSERNAME'.
+          ls_msg_data-openid = ls_data-tag_value.
+        ENDIF.
+        MODIFY ls_msg_data-data FROM ls_data.
+      ENDLOOP.
+      ls_msg_data-db_key = ls_msg_info-db_key.
+      ls_msg_data-da_key = ls_msg_info-da_key.
+* check implementation event
+      READ TABLE lt_event_filter INTO ls_event_filter WITH KEY msg_type = ls_msg_data-msg_type event = ls_msg_data-event.
+      IF sy-subrc <> 0.
+        ls_key-key = ls_msg_info-db_key.
+        APPEND ls_key TO lt_delete_key.
+* add log
+        CLEAR: ls_msg, lv_str.
+        convert_text_to_string(
+          EXPORTING
+            it_data   = ls_msg_data-data
+          IMPORTING
+            ev_string = lv_str ).
+        MESSAGE e012(cuan_wechat) WITH ls_msg_data-openid INTO lv_msg.
+        CALL METHOD mo_log->msg_add_with_extended_longtext
+          EXPORTING
+            it_data_tab  = ls_msg_data-data
+            iv_probclass = cl_cuan_wechat_log=>con_probclass_very_high.
+        CONTINUE.
+      ENDIF.
+      APPEND ls_msg_data TO et_msg_data.
+    ENDLOOP.
+
+    IF et_msg_data IS NOT INITIAL.
+      CLEAR: ls_msg, lv_lines.
+      lv_lines = lines( et_msg_data ).
+      MESSAGE i013(cuan_wechat) WITH lv_lines INTO lv_msg.
+      mo_log->msg_add( iv_probclass = cl_cuan_wechat_log=>con_probclass_low ).
+    ENDIF.
+
+* delete waste data
+    IF lt_delete_key IS NOT INITIAL.
+* add log
+      CLEAR: ls_msg, lv_lines.
+      MESSAGE i014(cuan_wechat) INTO lv_msg.
+      mo_log->msg_add( iv_probclass = cl_cuan_wechat_log=>con_probclass_low ).
+
+      lv_lines = lines( lt_delete_key ).
+* delete invalid data
+      delete_data( it_key = lt_delete_key ).
+* add log
+      CLEAR: ls_msg.
+      MESSAGE i015(cuan_wechat) WITH lv_lines INTO lv_msg.
+      mo_log->msg_add( iv_probclass = cl_cuan_wechat_log=>con_probclass_low ).
+    ELSE.
+      RETURN.
+    ENDIF.
+
+  ENDMETHOD.

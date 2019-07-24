@@ -1,0 +1,518 @@
+CLASS lcl_cuan_wechat_event_handler DEFINITION DEFERRED.
+
+CLASS cl_cuan_wechat_event_handler DEFINITION LOCAL FRIENDS lcl_cuan_wechat_event_handler.
+
+CLASS lcl_cuan_wechat_event_handler DEFINITION FOR TESTING.
+  PUBLIC SECTION.
+    INTERFACES if_http_server. "PARTIALLY IMPLEMENTED.
+    DATA http_server1 TYPE REF TO if_http_server.
+    DATA http_server2 TYPE REF TO if_http_server.
+    DATA http_server3 TYPE REF TO if_http_server.
+    DATA http_server4 TYPE REF TO if_http_server.
+    DATA http_server5 TYPE REF TO if_http_server.
+    DATA lt_da TYPE cuan_t_da_root.
+    DATA lr_entity  TYPE cuan_s_da_root..
+    DATA lv_string TYPE string.
+
+    METHODS: create_da1 FOR TESTING."status = 2
+    METHODS: create_da2 FOR TESTING."status = 3
+  PRIVATE SECTION.
+    DATA:
+      f_cut TYPE REF TO cl_cuan_wechat_event_handler.  "class under test
+    METHODS setup.
+    METHODS: check_wechat_signature FOR TESTING.
+    METHODS: handle_request FOR TESTING.
+
+ENDCLASS.       "lcl_Cuan_Wechat_Event_Handler
+
+CLASS ltcl_http_server_stub DEFINITION FINAL CREATE PUBLIC FOR TESTING.
+  PUBLIC SECTION.
+    INTERFACES if_http_server. "PARTIALLY IMPLEMENTED.
+    CLASS-METHODS create1 RETURNING VALUE(server) TYPE REF TO ltcl_http_server_stub.
+    CLASS-METHODS create2 RETURNING VALUE(server) TYPE REF TO ltcl_http_server_stub.
+    CLASS-METHODS create3 RETURNING VALUE(server) TYPE REF TO ltcl_http_server_stub.
+    CLASS-METHODS create4 RETURNING VALUE(server) TYPE REF TO ltcl_http_server_stub.
+    CLASS-METHODS create5 RETURNING VALUE(server) TYPE REF TO ltcl_http_server_stub.
+ENDCLASS.
+
+CLASS ltcl_http_server_stub IMPLEMENTATION.
+  " create
+  METHOD create1.
+    DATA lv_string TYPE string.
+    "CONCATENATE '/' gv_da_key1 INTO lv_string.
+    IMPORT lv_string TO lv_string FROM MEMORY ID 'DA_KEY1'.
+    CREATE OBJECT server.
+    CREATE OBJECT server->if_http_server~request TYPE cl_http_request
+      EXPORTING
+        add_c_msg = 1.
+    CREATE OBJECT server->if_http_server~response TYPE cl_http_response
+      EXPORTING
+        add_c_msg = 1.
+    CALL METHOD server->if_http_server~request->if_http_entity~set_header_field
+      EXPORTING
+        name  = '~path_info'
+        value = lv_string. "'/40F2E930666C1EE68AFA7A2B47903C29'. "status = 3 .
+  ENDMETHOD.
+
+  METHOD create2.
+    CREATE OBJECT server.
+    CREATE OBJECT server->if_http_server~request TYPE cl_http_request
+      EXPORTING
+        add_c_msg = 1.
+    CREATE OBJECT server->if_http_server~response TYPE cl_http_response
+      EXPORTING
+        add_c_msg = 1.
+    CALL METHOD server->if_http_server~request->if_http_entity~set_header_field
+      EXPORTING
+        name  = '~path_info'
+        value = '/6EAE8B4B92931EE681ECAAD638778291'. "invalid ID
+  ENDMETHOD.
+
+  METHOD create3.
+    DATA lv_string TYPE string.
+    "CONCATENATE '/' gv_da_key1 INTO lv_string.
+    IMPORT lv_string TO lv_string FROM MEMORY ID 'DA_KEY'.
+    CREATE OBJECT server.
+    CREATE OBJECT server->if_http_server~request TYPE cl_http_request
+      EXPORTING
+        add_c_msg = 1.
+    CREATE OBJECT server->if_http_server~response TYPE cl_http_response
+      EXPORTING
+        add_c_msg = 1.
+    CALL METHOD server->if_http_server~request->if_http_entity~set_header_field
+      EXPORTING
+        name  = '~path_info'
+        value = lv_string. "'/6EAE8B4B92931EE681ECAAD638778296'.
+    CALL METHOD server->if_http_server~request->if_http_entity~set_header_field
+      EXPORTING
+        name  = '~request_method'
+        value = 'GET'.
+    CALL METHOD server->if_http_server~request->if_http_entity~set_form_field
+      EXPORTING
+        name  = 'signature'
+        value = '8f1a2cc041144ca512a2a20e72c97f4e796a6a54'.
+  ENDMETHOD.
+
+  METHOD create4.
+    DATA lv_string TYPE string.
+    "CONCATENATE '/' gv_da_key1 INTO lv_string.
+    IMPORT lv_string TO lv_string FROM MEMORY ID 'DA_KEY'.
+    CREATE OBJECT server.
+    CREATE OBJECT server->if_http_server~request TYPE cl_http_request
+      EXPORTING
+        add_c_msg = 1.
+    CREATE OBJECT server->if_http_server~response TYPE cl_http_response
+      EXPORTING
+        add_c_msg = 1.
+    CALL METHOD server->if_http_server~request->if_http_entity~set_header_field
+      EXPORTING
+        name  = '~path_info'
+        value = lv_string. "'/6EAE8B4B92931EE681ECAAD638778296'.
+    CALL METHOD server->if_http_server~request->if_http_entity~set_header_field
+      EXPORTING
+        name  = '~request_method'
+        value = 'PUT'.
+    CALL METHOD server->if_http_server~request->if_http_entity~set_form_field
+      EXPORTING
+        name  = 'signature'
+        value = 'da39a3ee5e6b4b0d3255bfef95601890afd80709'.
+  ENDMETHOD.
+
+  METHOD create5.
+    DATA lv_string TYPE string.
+    "CONCATENATE '/' gv_da_key1 INTO lv_string.
+    IMPORT lv_string TO lv_string FROM MEMORY ID 'DA_KEY'.
+    CREATE OBJECT server.
+    CREATE OBJECT server->if_http_server~request TYPE cl_http_request
+      EXPORTING
+        add_c_msg = 1.
+    CREATE OBJECT server->if_http_server~response TYPE cl_http_response
+      EXPORTING
+        add_c_msg = 1.
+    CALL METHOD server->if_http_server~request->if_http_entity~set_header_field
+      EXPORTING
+        name  = '~path_info'
+        value = lv_string. "'/6EAE8B4B92931EE681ECAAD638778296'. "
+    CALL METHOD server->if_http_server~request->if_http_entity~set_header_field
+      EXPORTING
+        name  = '~request_method'
+        value = 'GET'.
+    CALL METHOD server->if_http_server~request->if_http_entity~set_form_field
+      EXPORTING
+        name  = 'signature'
+        value = 'da39a3ee5e6b4b0d3255bfef95601890afd80709'.
+  ENDMETHOD.
+ENDCLASS.
+
+CLASS lcl_cuan_wechat_event_handler IMPLEMENTATION.
+  METHOD setup.
+    http_server1  = ltcl_http_server_stub=>create1( ). "case1
+    http_server2  = ltcl_http_server_stub=>create2( ). "case2
+    http_server3  = ltcl_http_server_stub=>create3( ). "case3
+    http_server4  = ltcl_http_server_stub=>create4( ). "case4
+    http_server5  = ltcl_http_server_stub=>create5( ). "case5
+  ENDMETHOD.
+  METHOD handle_request.
+
+    CREATE OBJECT f_cut.
+    CALL METHOD f_cut->if_http_extension~handle_request
+      EXPORTING
+        server = http_server1.
+
+    CALL METHOD f_cut->if_http_extension~handle_request
+      EXPORTING
+        server = http_server2.
+
+    CALL METHOD f_cut->if_http_extension~handle_request
+      EXPORTING
+        server = http_server3.
+
+    CALL METHOD f_cut->if_http_extension~handle_request
+      EXPORTING
+        server = http_server4.
+
+    CALL METHOD f_cut->if_http_extension~handle_request
+      EXPORTING
+        server = http_server5.
+
+*create digital account
+    DATA: ls_modification TYPE /bobf/s_frw_modification.
+    DATA: lt_modification TYPE /bobf/t_frw_modification,
+          lt_comm_keys    TYPE     /bobf/t_frw_key,
+          lt_da_key       TYPE     /bobf/t_frw_key.
+    "lt_da_root      TYPE     cuan_t_da_root.
+    DATA lv_string TYPE string.
+    DATA lv_comcat_key TYPE string.
+    IMPORT lv_comcat_key TO lv_comcat_key FROM MEMORY ID 'COMCAT_KEY'.
+    IMPORT lv_string TO lv_string FROM MEMORY ID 'DA_KEY'.
+
+    SHIFT lv_string BY 1 PLACES.
+    DATA(ls_da) = NEW cuan_s_da_root( ).
+**   communication category
+    DATA(ls_comm_cat) = NEW cuan_s_comm_cat_root( ).
+    DATA(lo_transaction_mgr) = /bobf/cl_tra_trans_mgr_factory=>get_transaction_manager( ).
+    DATA(lo_service_mgr)    = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_digital_account_c=>sc_bo_key ).
+    DATA(lo_srv_comm)  = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_communication_cat_c=>sc_bo_key ).
+*    ls_comm_cat->key = lv_comcat_key.
+*    APPEND VALUE #( key = ls_comm_cat->key ) TO lt_comm_keys.
+*    ls_modification-data = ls_comm_cat.
+*    ls_modification-change_mode = /bobf/if_frw_c=>sc_modify_delete.
+*    ls_modification-node        = if_cuan_communication_cat_c=>sc_node-root.
+*    ls_modification-key         = ls_comm_cat->key.
+*    INSERT ls_modification INTO TABLE lt_modification.
+*    CLEAR ls_modification.
+*    lo_srv_comm->modify( EXPORTING it_modification = lt_modification
+*                            IMPORTING eo_change = DATA(lo_change) ).
+*    lo_transaction_mgr->save( IMPORTING ev_rejected = DATA(lv_save_rejected) ).
+
+
+
+
+*
+*    CLEAR lt_modification[].
+*    "ls_da->key = lv_string.
+*    ls_da->digacc_id = 'testat20160807'.
+*    SELECT SINGLE db_key FROM cuand_da_root INTO ls_da->key WHERE digacc_id = 'testat20160807'.
+*    "APPEND VALUE #( key = ls_da->key ) TO lt_da_key.
+*    ls_modification-data = ls_da.
+*    ls_modification-change_mode = /bobf/if_frw_c=>sc_modify_delete.
+*    ls_modification-node        = if_cuan_digital_account_c=>sc_node-root.
+*    ls_modification-key         = ls_da->key.
+*    INSERT ls_modification INTO TABLE lt_modification.
+*
+*    CLEAR:ls_modification.
+*    ls_da->digacc_id = 'testat20160808'.
+*    SELECT SINGLE db_key FROM cuand_da_root INTO ls_da->key WHERE digacc_id = 'testat20160808'.
+*    "APPEND VALUE #( key = ls_da->key ) TO lt_da_key.
+*    ls_modification-data = ls_da.
+*    ls_modification-change_mode = /bobf/if_frw_c=>sc_modify_delete.
+*    ls_modification-node        = if_cuan_digital_account_c=>sc_node-root.
+*    ls_modification-key         = ls_da->key.
+*    INSERT ls_modification INTO TABLE lt_modification.
+*    lo_service_mgr->modify( EXPORTING it_modification = lt_modification
+*                            IMPORTING eo_change = DATA(lo_change_c)
+*                                      eo_message = DATA(lo_message_c) ).
+*    lo_transaction_mgr->save( IMPORTING ev_rejected = DATA(lv_save_rejected) ).
+
+
+    DELETE FROM cuand_da_root WHERE digacc_id IN ( 'testat20160808','testat20160807' ).
+
+
+    CLEAR:ls_da,lv_comcat_key,lv_string,ls_comm_cat,"lo_transaction_mgr,lo_service_mgr,
+    lo_srv_comm,lt_comm_keys,ls_modification,lt_modification,"lv_save_rejected,
+    lt_da_key."lo_change_c,lo_message_c.
+
+
+    "    IMPORT lv_comcat_key TO lv_comcat_key FROM MEMORY ID 'COMCAT_KEY1'.
+*    IMPORT lv_string TO lv_string FROM MEMORY ID 'DA_KEY1'.
+*    SHIFT lv_string BY 1 PLACES.
+*    ls_da = NEW cuan_s_da_root( ).
+*   communication category
+*    ls_comm_cat = NEW cuan_s_comm_cat_root( ).
+*    lo_transaction_mgr = /bobf/cl_tra_trans_mgr_factory=>get_transaction_manager( ).
+*    lo_service_mgr    = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_digital_account_c=>sc_bo_key ).
+*    lo_srv_comm  = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_communication_cat_c=>sc_bo_key ).
+*    ls_comm_cat->key = lv_comcat_key.
+*    APPEND VALUE #( key = ls_comm_cat->key ) TO lt_comm_keys.
+*    ls_modification-data = ls_comm_cat.
+*    ls_modification-change_mode = /bobf/if_frw_c=>sc_modify_delete.
+*    ls_modification-node        = if_cuan_communication_cat_c=>sc_node-root.
+*    ls_modification-key         = ls_comm_cat->key.
+*    INSERT ls_modification INTO TABLE lt_modification.
+*    CLEAR ls_modification.
+*    lo_srv_comm->modify( EXPORTING it_modification = lt_modification
+*                            IMPORTING eo_change = lo_change ).
+*    lo_transaction_mgr->save( IMPORTING ev_rejected = lv_save_rejected ).
+*
+*    CLEAR lt_modification[].
+*    ls_da->key = lv_string.
+*    APPEND VALUE #( key = ls_da->key ) TO lt_da_key.
+*    ls_modification-data = ls_da.
+*    ls_modification-change_mode = /bobf/if_frw_c=>sc_modify_delete.
+*    ls_modification-node        = if_cuan_digital_account_c=>sc_node-root.
+*    ls_modification-key         = ls_da->key.
+*    INSERT ls_modification INTO TABLE lt_modification.
+*    lo_service_mgr->modify( EXPORTING it_modification = lt_modification
+*                            IMPORTING eo_change = lo_change_c
+*                                      eo_message = lo_message_c ).
+*    lo_transaction_mgr->save( IMPORTING ev_rejected = lv_save_rejected ).
+
+    DATA  lv_secstoid TYPE guid_32.
+    IMPORT lv_secstoid TO lv_secstoid FROM MEMORY ID 'SECSTOID'.
+    TRY.
+        CALL METHOD cl_cuan_digacc_prov=>sec_delete_api
+          EXPORTING
+            iv_id  = lv_secstoid
+            iv_dir = 'IN/'.
+      CATCH cx_cuan_digital_account .
+    ENDTRY.
+    CLEAR lv_secstoid.
+    IMPORT lv_secstoid TO lv_secstoid FROM MEMORY ID 'SECSTOID1'.
+    TRY.
+        CALL METHOD cl_cuan_digacc_prov=>sec_delete_api
+          EXPORTING
+            iv_id  = lv_secstoid
+            iv_dir = 'IN/'.
+      CATCH cx_cuan_digital_account .
+    ENDTRY.
+    COMMIT WORK AND WAIT.
+  ENDMETHOD.
+  METHOD create_da1.
+*create digital account
+    DATA: ls_modification TYPE /bobf/s_frw_modification.
+    DATA: lt_modification TYPE /bobf/t_frw_modification,
+          lt_comm_keys    TYPE     /bobf/t_frw_key,
+          lt_da_key       TYPE     /bobf/t_frw_key.
+    DATA  iv_dasecret    TYPE   string.
+    DATA  lv_comcat_key TYPE string.
+    DATA  lv_secstoid TYPE guid_32.
+    DATA(ls_da) = NEW cuan_s_da_root( ).
+**   communication category
+*    DATA(ls_comm_cat) = NEW cuan_s_comm_cat_root( ).
+    DATA(lo_transaction_mgr) = /bobf/cl_tra_trans_mgr_factory=>get_transaction_manager( ).
+    DATA(lo_service_mgr)    = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_digital_account_c=>sc_bo_key ).
+    " DATA lo_service_mgr TYPE REF TO th_cuan_da_bopf_tra_srv_managr.
+    "CREATE OBJECT lo_service_mgr.
+*    DATA(lo_srv_comm)  = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_communication_cat_c=>sc_bo_key ).
+*    ls_comm_cat->key = /bobf/cl_frw_factory=>get_new_key( ).
+*    ls_comm_cat->name = 'testat20160802'."ls_da->digacc_id.
+*    ls_comm_cat->mkt_area_id = 'GLOBAL'."previous set 'GLOBAL' default
+*    ls_comm_cat->comm_cat_usage = 01. "please see the domain, 01 instead of digital account.
+*    APPEND VALUE #( key = ls_comm_cat->key ) TO lt_comm_keys.
+*    lv_comcat_key =  ls_comm_cat->key.
+*    EXPORT lv_comcat_key FROM lv_comcat_key TO MEMORY ID 'COMCAT_KEY'.
+*
+*    ls_modification-data = ls_comm_cat.
+*    ls_modification-change_mode = /bobf/if_frw_c=>sc_modify_create.
+*    ls_modification-node        = if_cuan_communication_cat_c=>sc_node-root.
+*    ls_modification-key         = ls_comm_cat->key.
+*    INSERT ls_modification INTO TABLE lt_modification.
+*    CLEAR ls_modification.
+*    lo_srv_comm->modify( EXPORTING it_modification = lt_modification
+*                            IMPORTING eo_change = DATA(lo_change) ).
+*    lo_transaction_mgr->save( IMPORTING ev_rejected = DATA(lv_save_rejected) ).
+    CLEAR lt_modification[].
+
+    ls_da->key = /bobf/cl_frw_factory=>get_new_key( ).
+    TRY .
+        ls_da->secstoid = cl_system_uuid=>create_uuid_x16_static( ).
+      CATCH cx_uuid_error INTO DATA(ex_error).
+    ENDTRY.
+    ls_da->digacc_id = 'testat20160807'.
+    "   ls_da->comm_cat_key  = ls_comm_cat->key.
+    ls_da->status = '2'.
+    ls_da->crea_uname = sy-uname.
+    APPEND VALUE #( key = ls_da->key ) TO lt_da_key.
+
+    TRY .
+        CALL METHOD cl_cuan_digacc_prov=>sec_modify_api
+          EXPORTING
+            iv_id       = ls_da->secstoid
+            iv_dir      = 'IN/'
+            iv_method   = 'INSERT'
+            iv_dasecret = iv_dasecret.
+      CATCH cx_cuan_digital_account.
+
+    ENDTRY.
+
+    ls_modification-data = ls_da.
+    ls_modification-change_mode = /bobf/if_frw_c=>sc_modify_create.
+    ls_modification-node        = if_cuan_digital_account_c=>sc_node-root.
+    ls_modification-key         = ls_da->key.
+    INSERT ls_modification INTO TABLE lt_modification.
+    lo_service_mgr->modify( EXPORTING it_modification = lt_modification
+                            IMPORTING eo_change = DATA(lo_change_c)
+                                      eo_message = DATA(lo_message_c) ).
+    lo_transaction_mgr->save( IMPORTING ev_rejected = DATA(lv_save_rejected) ).
+    lo_service_mgr->retrieve( EXPORTING iv_node_key = if_cuan_digital_account_c=>sc_node-root  "RETRIEVE from data base, as buffer deleted before
+                                        it_key = lt_da_key
+                                IMPORTING et_data = lt_da ).
+    IF lt_da IS NOT INITIAL.
+      MOVE-CORRESPONDING lt_da[ 1 ] TO lr_entity.
+      lr_entity-key =  lt_da[ 1 ]-key.
+      lv_string = lr_entity-key.
+      CONCATENATE '/'  lv_string INTO lv_string.
+      EXPORT lv_string FROM lv_string TO MEMORY ID 'DA_KEY'.
+      lv_secstoid = ls_da->secstoid.
+      EXPORT lv_secstoid FROM lv_secstoid TO MEMORY ID 'SECSTOID'.
+    ENDIF.
+
+  ENDMETHOD.
+  METHOD create_da2.
+*create digital account
+    DATA: ls_modification TYPE /bobf/s_frw_modification.
+    DATA: lt_modification TYPE /bobf/t_frw_modification,
+          lt_comm_keys    TYPE     /bobf/t_frw_key,
+          lt_da_key       TYPE     /bobf/t_frw_key.
+    DATA  iv_dasecret    TYPE   string.
+    DATA  lv_comcat_key TYPE string.
+    DATA  lv_secstoid TYPE guid_32.
+    DATA(ls_da) = NEW cuan_s_da_root( ).
+**   communication category
+*    DATA(ls_comm_cat) = NEW cuan_s_comm_cat_root( ).
+    DATA(lo_transaction_mgr) = /bobf/cl_tra_trans_mgr_factory=>get_transaction_manager( ).
+    DATA(lo_service_mgr)    = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_digital_account_c=>sc_bo_key ).
+    "DATA lo_service_mgr TYPE REF TO th_cuan_da_bopf_tra_srv_managr.
+    "CREATE OBJECT lo_service_mgr.
+*    DATA(lo_srv_comm)  = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_communication_cat_c=>sc_bo_key ).
+*    ls_comm_cat->key = /bobf/cl_frw_factory=>get_new_key( ).
+*    ls_comm_cat->name = 'testat20160803'."ls_da->digacc_id.
+*    ls_comm_cat->mkt_area_id = 'GLOBAL'."previous set 'GLOBAL' default
+*    ls_comm_cat->comm_cat_usage = 01. "please see the domain, 01 instead of digital account.
+*    APPEND VALUE #( key = ls_comm_cat->key ) TO lt_comm_keys.
+*    lv_comcat_key =  ls_comm_cat->key.
+*    EXPORT lv_comcat_key FROM lv_comcat_key TO MEMORY ID 'COMCAT_KEY1'.
+*
+*    ls_modification-data = ls_comm_cat.
+*    ls_modification-change_mode = /bobf/if_frw_c=>sc_modify_create.
+*    ls_modification-node        = if_cuan_communication_cat_c=>sc_node-root.
+*    ls_modification-key         = ls_comm_cat->key.
+*    INSERT ls_modification INTO TABLE lt_modification.
+*    CLEAR ls_modification.
+*    lo_srv_comm->modify( EXPORTING it_modification = lt_modification
+*                            IMPORTING eo_change = DATA(lo_change) ).
+*    lo_transaction_mgr->save( IMPORTING ev_rejected = DATA(lv_save_rejected) ).
+    CLEAR lt_modification[].
+
+    ls_da->key = /bobf/cl_frw_factory=>get_new_key( ).
+    TRY .
+        ls_da->secstoid = cl_system_uuid=>create_uuid_x16_static( ).
+      CATCH cx_uuid_error INTO DATA(ex_error).
+    ENDTRY.
+    ls_da->digacc_id = 'testat20160808'.
+    "ls_da->comm_cat_key  = ls_comm_cat->key.
+    ls_da->status = '3'.
+    ls_da->crea_uname = sy-uname.
+    APPEND VALUE #( key = ls_da->key ) TO lt_da_key.
+
+    TRY .
+        CALL METHOD cl_cuan_digacc_prov=>sec_modify_api
+          EXPORTING
+            iv_id       = ls_da->secstoid
+            iv_dir      = 'IN/'
+            iv_method   = 'INSERT'
+            iv_dasecret = iv_dasecret.
+      CATCH cx_cuan_digital_account.
+
+    ENDTRY.
+
+    ls_modification-data = ls_da.
+    ls_modification-change_mode = /bobf/if_frw_c=>sc_modify_create.
+    ls_modification-node        = if_cuan_digital_account_c=>sc_node-root.
+    ls_modification-key         = ls_da->key.
+    INSERT ls_modification INTO TABLE lt_modification.
+    lo_service_mgr->modify( EXPORTING it_modification = lt_modification
+                            IMPORTING eo_change = DATA(lo_change_c)
+                                      eo_message = DATA(lo_message_c) ).
+    lo_transaction_mgr->save( IMPORTING ev_rejected = DATA(lv_save_rejected) ).
+    lo_service_mgr->retrieve( EXPORTING iv_node_key = if_cuan_digital_account_c=>sc_node-root  "RETRIEVE from data base, as buffer deleted before
+                                        it_key = lt_da_key
+                                IMPORTING et_data = lt_da ).
+
+    MOVE-CORRESPONDING lt_da[ 1 ] TO lr_entity.
+    lr_entity-key =  lt_da[ 1 ]-key.
+    lv_string = lr_entity-key.
+    CONCATENATE '/'  lv_string INTO lv_string.
+    EXPORT lv_string FROM lv_string TO MEMORY ID 'DA_KEY1'.
+    lv_secstoid = ls_da->secstoid.
+    EXPORT lv_secstoid FROM lv_secstoid TO MEMORY ID 'SECSTOID1'.
+  ENDMETHOD.
+  METHOD check_wechat_signature.
+    DATA  :lv_secstoid  TYPE guid_32,
+           iv_client    TYPE mandt,
+           iv_timestamp TYPE string,
+           iv_nonce     TYPE string,
+           iv_signature TYPE string.
+    DATA:ev_success	    TYPE boolean,
+         ev_secstr      TYPE string,
+         ev_success_exp	TYPE boolean,
+         ev_secstr_exp  TYPE string.
+
+    IMPORT lv_secstoid TO lv_secstoid FROM MEMORY ID 'SECSTOID'.
+    CREATE OBJECT f_cut.
+    iv_client = sy-mandt.
+    CALL METHOD f_cut->check_wechat_signature
+      EXPORTING
+        iv_secstore_id = lv_secstoid
+        iv_client      = iv_client
+        iv_timestamp   = iv_timestamp
+        iv_nonce       = iv_nonce
+        iv_signature   = iv_signature
+      IMPORTING
+        ev_success     = ev_success
+        ev_secstr      = ev_secstr.
+**compare the result
+    CALL METHOD cl_abap_unit_assert=>assert_equals
+      EXPORTING
+        act = ev_secstr
+        exp = ev_secstr_exp.
+    CALL METHOD cl_abap_unit_assert=>assert_equals
+      EXPORTING
+        act = ev_success
+        exp = ev_success_exp.
+
+    CLEAR:lv_secstoid,ev_success,ev_success_exp,ev_secstr,ev_secstr_exp.
+*
+*    iv_signature = 'da39a3ee5e6b4b0d3255bfef95601890afd80709'.
+*    CALL METHOD f_cut->check_wechat_signature
+*      EXPORTING
+*        iv_secstore_id = lv_secstoid
+*        iv_client      = iv_client
+*        iv_timestamp   = iv_timestamp
+*        iv_nonce       = iv_nonce
+*        iv_signature   = iv_signature
+*      IMPORTING
+*        ev_success     = ev_success
+*        ev_secstr      = ev_secstr.
+***compare the result
+*    CALL METHOD cl_abap_unit_assert=>assert_equals
+*      EXPORTING
+*        act = ev_secstr
+*        exp = ev_secstr_exp.
+*    ev_success_exp = 'X'.
+*    CALL METHOD cl_abap_unit_assert=>assert_equals
+*      EXPORTING
+*        act = ev_success
+*        exp = ev_success_exp.
+  ENDMETHOD.
+ENDCLASS.

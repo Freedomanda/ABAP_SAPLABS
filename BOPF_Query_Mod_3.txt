@@ -1,0 +1,1712 @@
+class CL_CUAN_DIGACC_API definition
+  public
+  final
+  create public .
+
+public section.
+
+  types:
+    BEGIN OF ts_typeimpl,
+        digacc_type        TYPE string,
+        digacc_impl        TYPE REF TO if_cuan_digital_account,
+      END OF ts_typeimpl .
+  types:
+    tt_typeimpl TYPE STANDARD TABLE OF ts_typeimpl .
+
+  methods GET_DIGACCS_BY_COMM_MEDIUM
+    importing
+      !IV_COMM_MEDIUM type CUAN_CE_COMM_MEDIUM
+      !IV_ACTIVE type CHAR1
+    exporting
+      !ET_DIGACC type CUAN_T_DA_ROOT .
+  methods CLEAN_UP .
+  methods SAVE
+    exporting
+      !EV_REJECTED type BOOLE_D
+      !EO_CHANGE type ref to /BOBF/IF_TRA_CHANGE
+      !EO_MESSAGE type ref to /BOBF/IF_FRW_MESSAGE
+      !ET_REJECTING_BO_KEY type /BOBF/T_FRW_KEY2 .
+  methods QUERY_DIGACC
+    importing
+      !IT_SELECT_OPTIONS type HPA_T_READ_ACCESS_SEL_OPTIONS optional
+      !IS_OPTIONS type HPA_S_READ_ACCESS_OPTIONS optional
+      !IV_SEARCH_STRING type HPA_SEARCH_STRING optional
+      !IV_EXT_WHERE_CONDITIONS type HPA_EXT_WHERE_CONDITIONS optional
+      !IT_REQUESTED_FIELD type /BOBF/T_FRW_NAME optional
+    exporting
+      !ET_DIGACC type CUAN_T_DA_EXT
+    raising
+      CX_CUAN_DIGITAL_ACCOUNT .
+  methods UPDATE_DIGACC
+    importing
+      !IS_ROOT type CUAN_S_DA_ROOT
+    exporting
+      !EO_MESSAGE type ref to /BOBF/IF_FRW_MESSAGE
+      !EO_CHANGE type ref to /BOBF/IF_TRA_CHANGE
+    raising
+      CX_CUAN_DIGITAL_ACCOUNT .
+  methods READ_DIGACC
+    importing
+      !IV_DA_KEY type /BOBF/CONF_KEY
+      !IV_FILL_DIGACC_EXT_INFO type ABAP_BOOL default ABAP_TRUE
+    exporting
+      !ES_DIGACC type CUAN_S_DA_EXT
+      !ET_CREDENTIAL type CUAN_T_EXT_TO_DA
+    raising
+      CX_CUAN_DIGITAL_ACCOUNT .
+  class-methods GET_INSTANCE
+    returning
+      value(RO_INSTANCE) type ref to CL_CUAN_DIGACC_API .
+  methods CONSTRUCTOR
+    importing
+      !IT_TYPEIMPL type TT_TYPEIMPL optional .
+  methods CREATE_DIGACC
+    importing
+      !IV_COMMCAT_CREATE_FLAG type ABAP_BOOL default ABAP_TRUE
+      !IS_DIGACC type CUAN_S_DA_ROOT
+    exporting
+      !EO_MESSAGE type ref to /BOBF/IF_FRW_MESSAGE
+      !EO_CHANGE type ref to /BOBF/IF_TRA_CHANGE
+    raising
+      CX_CUAN_DIGITAL_ACCOUNT .
+  methods GET_SUBSCRIBERS
+    importing
+      !IV_DA_KEY type /BOBF/CONF_KEY
+      !IT_SELECT_OPTIONS type HPA_T_READ_ACCESS_SEL_OPTIONS optional
+      !IS_OPTIONS type HPA_S_READ_ACCESS_OPTIONS optional
+      !IV_SEARCH_STRING type HPA_SEARCH_STRING optional
+    exporting
+      !ET_EXPORTING type CUAN_T_DA_MEMBER
+    raising
+      CX_CUAN_DIGITAL_ACCOUNT .
+  methods MIGRATE_DA_TO_EXT
+    importing
+      !IT_DA_ROOT type CUAN_T_DA_ROOT
+    raising
+      CX_CUAN_DIGITAL_ACCOUNT .
+  methods GET_DA_CREDENTIALS
+    importing
+      !IV_KEY type /BOBF/CONF_KEY
+      !IV_BO type BOOLE_D default ABAP_TRUE
+      !IS_DIGACC type CUAN_S_DA_ROOT optional
+    exporting
+      !ET_CREDENTIAL type CUAN_T_EXT_TO_DA
+      !EV_UPDATE type BOOLE_D
+    raising
+      CX_CUAN_DIGITAL_ACCOUNT .
+  methods GET_SUBSCRIBERS_ALL
+    importing
+      !IT_DA_KEY type /BOBF/T_FRW_KEY optional
+      !IV_DA_KEY type /BOBF/CONF_KEY optional
+      !IT_SELECT_OPTIONS type HPA_T_READ_ACCESS_SEL_OPTIONS optional
+      !IS_OPTIONS type HPA_S_READ_ACCESS_OPTIONS optional
+      !IV_SEARCH_STRING type HPA_SEARCH_STRING optional
+    exporting
+      !ET_EXPORTING type CUAN_T_DA_MEMBER
+      !ET_EXPORTING_CDS type CUAN_T_DA_CDS_MEMBER
+    raising
+      CX_CUAN_DIGITAL_ACCOUNT .
+protected section.
+
+  class-data MO_INSTANCE type ref to CL_CUAN_DIGACC_API .
+private section.
+
+  TYPES: BEGIN OF gs_digital_account_sub_count,
+    account_key TYPE /BOBF/CONF_KEY,
+    count  TYPE i,
+  END OF gs_digital_account_sub_count.
+
+  data MO_SERVICE_MGR type ref to /BOBF/IF_TRA_SERVICE_MANAGER .
+  data MO_TRANSACTION_MGR type ref to /BOBF/IF_TRA_TRANSACTION_MGR .
+  data MT_TYPE_IMPL type TT_TYPEIMPL .
+  constants C_NTWRK_INBOUND_SERVICE_ID_OP type STRING value '/sap/public/cuan/ntwrk' ##NO_TEXT.
+  constants C_NTWRK_INBOUND_SERVICE_ID_PC type STRING value '/sap/cuan/ntwrk' ##NO_TEXT.
+  data MT_DA_MEMBER TYPE TABLE OF gs_digital_account_sub_count WITH EMPTY KEY.
+
+  methods FILL_DIGACC_FIGURE
+    importing
+      !IS_ROOT type CUAN_S_DA_ROOT
+    exporting
+      !ES_DIGACC type CUAN_S_DA_EXT
+    raising
+      CX_CUAN_DIGITAL_ACCOUNT .
+  methods FILL_DIGACC_INFO
+    importing
+      !IV_EXTEND_FLAG type ABAP_BOOL default ABAP_FALSE
+      !IS_ROOT type CUAN_S_DA_ROOT
+    exporting
+      !ES_DIGACC type CUAN_S_DA_EXT
+      !ET_CREDENTIAL type CUAN_T_EXT_TO_DA
+    raising
+      CX_CUAN_DIGITAL_ACCOUNT .
+  methods GET_FIRST_DAY
+    importing
+      !IV_MONTHS type INT4
+      !IV_INIT_DATE type SY-DATUM
+    exporting
+      !OV_FIRST_CURRENT_MONTH type SY-DATUM
+      !OV_FIRST_NEXT_MONTH type SY-DATUM .
+  methods COMMCAT_CREATE
+    importing
+      !IS_DIGACC type CUAN_S_DA_ROOT
+    exporting
+      !EO_MESSAGE type ref to /BOBF/IF_FRW_MESSAGE
+      !EO_CHANGE type ref to /BOBF/IF_TRA_CHANGE
+    raising
+      CX_CUAN_DIGITAL_ACCOUNT .
+  methods GET_DIGACC_IMPL_BY_TYPE
+    importing
+      !IV_DA_TYPE type CUAN_DIGITAL_ACCOUNT_TYPE
+    returning
+      value(ER_CONN) type ref to IF_CUAN_DIGITAL_ACCOUNT .
+  methods MODIFY_SEC
+    importing
+      !IV_DATA type STRING
+      !IV_GUID type GUID_32
+      !IV_METHOD type STRING
+    raising
+      CX_CUAN_DIGITAL_ACCOUNT .
+  methods GET_INBOUND_SERVICE_PATH
+    importing
+      !IV_DA_KEY type /BOBF/CONF_KEY
+    returning
+      value(RV_PATH) type STRING .
+ENDCLASS.
+
+
+
+CLASS CL_CUAN_DIGACC_API IMPLEMENTATION.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_DIGACC_API->CLEAN_UP
+* +-------------------------------------------------------------------------------------------------+
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  method CLEAN_UP.
+
+     mo_transaction_mgr->cleanup( ).
+
+  endmethod.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method CL_CUAN_DIGACC_API->COMMCAT_CREATE
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IS_DIGACC                      TYPE        CUAN_S_DA_ROOT
+* | [<---] EO_MESSAGE                     TYPE REF TO /BOBF/IF_FRW_MESSAGE
+* | [<---] EO_CHANGE                      TYPE REF TO /BOBF/IF_TRA_CHANGE
+* | [!CX!] CX_CUAN_DIGITAL_ACCOUNT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD commcat_create.
+
+    DATA:
+      ls_modification TYPE        /bobf/s_frw_modification,
+      lt_modification TYPE        /bobf/t_frw_modification,
+      lo_srv_comm     TYPE REF TO /bobf/if_tra_service_manager,
+      lr_comm_cat     TYPE REF TO cuan_s_comm_cat_root,
+      lo_change       TYPE REF TO /bobf/if_tra_change,
+      lo_message      TYPE REF TO /bobf/if_frw_message,
+      ls_msg          TYPE        /bobf/s_frw_message_k,
+      lv_msg_v1       TYPE        symsgv,
+      lv_message      TYPE        string.
+
+
+    FIELD-SYMBOLS <ls_commcat> TYPE cuan_s_comm_cat_root.
+    CLEAR: ls_modification, lt_modification.
+
+    lo_srv_comm = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_communication_cat_c=>sc_bo_key ).
+
+    CREATE DATA lr_comm_cat.
+    ASSIGN lr_comm_cat->* TO <ls_commcat>.
+
+*   prepare data
+    <ls_commcat>-key              =   is_digacc-comm_cat_key.
+    <ls_commcat>-name             =   is_digacc-digacc_id.
+    <ls_commcat>-mkt_area_id      =   is_digacc-mkt_area_id.
+    <ls_commcat>-comm_cat_usage   =   01.   "please see the domain, 01 means digital account.
+
+    ls_modification-data          =   lr_comm_cat.
+    ls_modification-change_mode   =   /bobf/if_frw_c=>sc_modify_create.
+    ls_modification-node          =   if_cuan_communication_cat_c=>sc_node-root.
+    ls_modification-key           =   <ls_commcat>-key.
+    APPEND ls_modification TO lt_modification.
+
+    lo_srv_comm->modify( EXPORTING it_modification  =   lt_modification
+                         IMPORTING eo_change        =   lo_change
+                                   eo_message       =   lo_message ).
+
+    IF lo_change IS BOUND AND lo_change->has_failed_changes( ) EQ abap_true.
+      CALL METHOD lo_message->get_messages
+        IMPORTING
+          et_message = DATA(lt_msg).
+      LOOP AT lt_msg INTO ls_msg.
+        lv_message = ls_msg-message->if_message~get_text( ).
+      ENDLOOP.
+      lv_msg_v1 = lv_message.
+      RAISE EXCEPTION TYPE cx_cuan_digital_account
+        EXPORTING
+          textid     = cx_cuan_digital_account=>communication_creation_error
+          message_v1 = lv_msg_v1.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_DIGACC_API->CONSTRUCTOR
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IT_TYPEIMPL                    TYPE        TT_TYPEIMPL(optional)
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD constructor.
+
+    DATA:
+      lr_digacc_impl TYPE REF TO if_cuan_digital_account.
+
+    IF mo_transaction_mgr IS NOT BOUND.
+      mo_transaction_mgr = /bobf/cl_tra_trans_mgr_factory=>get_transaction_manager( ).
+    ENDIF.
+
+    IF mo_service_mgr IS NOT BOUND.
+      mo_service_mgr ?= /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_digital_account_c=>sc_bo_key ).
+    ENDIF.
+
+*   add another social app
+    CLEAR mt_type_impl.
+    IF it_typeimpl IS INITIAL.
+      CREATE OBJECT lr_digacc_impl TYPE ('CL_CUAN_DIGITAL_ACCOUNT_WECHAT').
+      APPEND VALUE #( digacc_type = 'WEC_SERACC' digacc_impl = lr_digacc_impl  ) TO mt_type_impl.
+      APPEND VALUE #( digacc_type = 'WEC_SUBACC' digacc_impl = lr_digacc_impl  ) TO mt_type_impl.
+
+      CREATE OBJECT lr_digacc_impl TYPE ('CL_CUAN_DIGITAL_ACCOUNT_LINE').
+      APPEND VALUE #( digacc_type = 'LINE_BOT' digacc_impl = lr_digacc_impl  ) TO mt_type_impl.
+      APPEND VALUE #( digacc_type = 'LINE_OFC' digacc_impl = lr_digacc_impl  ) TO mt_type_impl.
+    ELSE.
+      MOVE-CORRESPONDING it_typeimpl TO mt_type_impl.
+    ENDIF.
+
+    mo_instance = me.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_DIGACC_API->CREATE_DIGACC
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_COMMCAT_CREATE_FLAG         TYPE        ABAP_BOOL (default =ABAP_TRUE)
+* | [--->] IS_DIGACC                      TYPE        CUAN_S_DA_ROOT
+* | [<---] EO_MESSAGE                     TYPE REF TO /BOBF/IF_FRW_MESSAGE
+* | [<---] EO_CHANGE                      TYPE REF TO /BOBF/IF_TRA_CHANGE
+* | [!CX!] CX_CUAN_DIGITAL_ACCOUNT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD create_digacc.
+
+    DATA:
+      lv_data         TYPE    string,
+      lv_token        TYPE    string,
+      lv_message      TYPE    string,
+      ls_msg          TYPE    /bobf/s_frw_message_k,
+      lv_guid         TYPE    guid_32,
+      ls_modification TYPE    /bobf/s_frw_modification,
+      lt_modification TYPE    /bobf/t_frw_modification,
+      lv_appid        TYPE    string,
+      lv_secid        TYPE    string,
+      lv_msg_v1       TYPE    symsgv,
+      lv_msg_v2       TYPE    symsgv,
+      ls_t100_key     TYPE    scx_t100key,
+      ls_digacc       TYPE    cuan_s_da_root,
+      ls_digacc_ret   TYPE    cuan_s_da_root,
+      ls_da           TYPE REF TO   cuan_s_da_root,
+      lr_digacc_impl  TYPE REF TO   if_cuan_digital_account.
+
+    DATA:lt_ext_da      TYPE cuan_t_ext_da,
+         ls_ext_da      TYPE cuan_s_ext_da,
+         lt_ext_da_attr TYPE cuan_t_ext_to_da,
+         ls_ext_da_attr TYPE REF TO cuan_s_ext_to_da.
+    DATA:lt_da_types       TYPE STANDARD TABLE OF cuanc_da_type,
+         ls_da_type        LIKE LINE OF lt_da_types,
+         lt_da_ext_att_def TYPE cuan_t_da_atr_def,
+         ls_da_ext_att_def TYPE cuan_s_da_atr_def.
+
+**********************************************************************************************************
+
+    mo_transaction_mgr->cleanup( ).
+
+**********************************************************************************************************
+* Before Creation, do connection test
+    TRY.
+        MOVE-CORRESPONDING is_digacc TO ls_digacc.
+
+        CALL METHOD me->get_digacc_impl_by_type
+          EXPORTING
+            iv_da_type = ls_digacc-digacc_type
+          RECEIVING
+            er_conn    = lr_digacc_impl.
+        IF lr_digacc_impl IS BOUND.
+          CALL METHOD lr_digacc_impl->additional_check
+            EXPORTING
+              is_digacc = ls_digacc.
+
+          CALL METHOD lr_digacc_impl->connection_test
+            EXPORTING
+              is_digacc = ls_digacc
+            IMPORTING
+              ev_token  = lv_token
+              es_digacc = ls_digacc_ret.
+        ENDIF.
+        ls_digacc-avatar = ls_digacc_ret-avatar.
+
+*********************************************************************************************************
+*  Prepare facet data for creation (communication category, secure storage)
+        CREATE DATA ls_da.
+        MOVE-CORRESPONDING ls_digacc TO ls_da->*.
+
+        IF iv_commcat_create_flag = abap_true.
+          ls_da->comm_cat_key = /bobf/cl_frw_factory=>get_new_key( ).
+          CALL METHOD me->commcat_create( EXPORTING is_digacc = ls_da->* ).
+        ENDIF.
+
+        CLEAR lt_modification[].
+
+        ls_da->digitalaccountextattribute = lt_ext_da.
+*********************************************************************************************************
+*  Prepare digital account data for creation
+        ls_da->key                  =   /bobf/cl_frw_factory=>get_new_key( ).
+        ls_da->status               =   if_cuan_digital_account=>gc_digacc_status_active. "after connect test. then save this to DB
+        ls_modification-data        =   ls_da.
+        ls_modification-change_mode =   /bobf/if_frw_c=>sc_modify_create.
+        ls_modification-node        =   if_cuan_digital_account_c=>sc_node-root.
+        ls_modification-key         =   ls_da->key.
+        APPEND ls_modification TO lt_modification.
+
+        mo_service_mgr->modify(
+            EXPORTING it_modification = lt_modification
+            IMPORTING eo_change = DATA(lo_change_c)
+                      eo_message = DATA(lo_message_c) ).
+
+        IF lo_message_c IS NOT INITIAL.
+          CALL METHOD lo_message_c->get_messages
+            IMPORTING
+              et_message = DATA(lt_msg).
+          LOOP AT lt_msg INTO ls_msg.
+*           Alternative Key Check
+            IF ls_msg-val_key = if_cuan_digital_account_c=>sc_validation-root-check_unique_altkeys.
+              CLEAR: lv_msg_v1, lv_msg_v2.
+              lv_msg_v1 = ls_digacc-digacc_id.
+              lv_msg_v2 = ls_digacc-digacc_type.
+*              RAISE EXCEPTION TYPE cx_cuan_digital_account
+*                EXPORTING
+*                  textid     = cx_cuan_digital_account=>identicalkey_check_error
+*                  message_v1 = lv_msg_v1
+*                  message_v2 = lv_msg_v2.
+              RAISE EXCEPTION TYPE cx_cuan_digital_account
+                EXPORTING
+                  "textid     = cx_cuan_digital_account=>identicalkey_check_error
+                  message_v1 = 'DIGACC_NAME' "lv_msg_v1
+                  message_v2 = 'CM_CUAN_DA' "lv_msg_v2.
+                  message_v3 = '008'.
+            ENDIF.
+          ENDLOOP.
+*create secure stroge records for extended attribute
+          "get communication medium by digital account type
+          SELECT SINGLE * FROM cuanc_da_type INTO ls_da_type WHERE da_type_id = ls_digacc-digacc_type.
+          "get extended attributes by commnication medium
+
+         CALL METHOD cl_cuan_da_type_customizing=>get_da_ext_atr_def
+           EXPORTING
+             iv_comm_medium = ls_da_type-comm_medium
+           IMPORTING
+             et_atr_def     = lt_da_ext_att_def.
+
+         " SELECT * FROM cuanc_da_atr_def INTO CORRESPONDING FIELDS OF TABLE lt_da_ext_att_def WHERE comm_medium = ls_da_type-comm_medium.
+          lt_ext_da = ls_digacc-digitalaccountextattribute.
+
+          CLEAR lt_modification[].
+          CREATE DATA ls_ext_da_attr.
+          "MOVE-CORRESPONDING ls_digacc TO ls_da->*.
+
+          LOOP AT lt_ext_da INTO ls_ext_da.
+            CLEAR:lv_guid,ls_da_ext_att_def,lv_data,ls_modification,lt_modification[],ls_ext_da_attr.
+            CREATE DATA ls_ext_da_attr.
+            ls_ext_da_attr->digital_account_key = ls_da->key.
+            ls_ext_da_attr->parent_key = ls_da->key.
+            ls_ext_da_attr->attribute_name = ls_ext_da-attribute_name.
+
+            READ TABLE lt_da_ext_att_def INTO ls_da_ext_att_def WITH KEY attribute_name = ls_ext_da-attribute_name.
+            IF sy-subrc = 0 .
+              IF ls_da_ext_att_def-is_secure = abap_true.
+                lv_guid = cl_system_uuid=>create_uuid_x16_static( ).
+                lv_data = ls_ext_da-attribute_value.
+                CALL METHOD me->modify_sec( EXPORTING iv_guid = lv_guid iv_data = lv_data iv_method = 'INSERT').
+                ls_ext_da_attr->attribute_secure_ref = lv_guid.
+              ELSE.
+                ls_ext_da_attr->attribute_value = ls_ext_da-attribute_value.
+              ENDIF.
+            ENDIF.
+            "APPEND ls_ext_da_attr to lt_ext_da_attr.
+
+            ls_ext_da_attr->key          =   /bobf/cl_frw_factory=>get_new_key( ).
+            "ls_da->status              =   if_cuan_digital_account=>gc_digacc_status_active. "after connect test. then save this to DB
+            ls_modification-data        =   ls_ext_da_attr.
+            ls_modification-change_mode =   /bobf/if_frw_c=>sc_modify_create.
+            ls_modification-node        =   if_cuan_digital_account_c=>sc_node-extended.
+            ls_modification-key         =   ls_ext_da_attr->key.
+            ls_modification-association = if_cuan_digital_account_c=>sc_association-extended-to_root.
+            ls_modification-source_node = if_cuan_digital_account_c=>sc_node-root.
+            ls_modification-source_key = ls_da->key.
+            APPEND ls_modification TO lt_modification.
+*create extended attribute by BO
+
+            mo_service_mgr->modify(
+                EXPORTING it_modification = lt_modification
+                IMPORTING eo_change = lo_change_c
+                          eo_message = lo_message_c ).
+          ENDLOOP.
+
+
+        ENDIF.
+      CATCH cx_uuid_error INTO DATA(lx_ex_uuid).
+        ls_t100_key = cx_cuan_digital_account=>cx_cuan_digital_account.
+        ls_t100_key-attr1 = lx_ex_uuid->get_text( ).
+
+        RAISE EXCEPTION TYPE cx_cuan_digital_account
+          EXPORTING
+            textid = ls_t100_key.
+
+      CATCH cx_cuan_digital_account INTO DATA(lx_ex).
+        RAISE EXCEPTION lx_ex.
+    ENDTRY.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method CL_CUAN_DIGACC_API->FILL_DIGACC_FIGURE
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IS_ROOT                        TYPE        CUAN_S_DA_ROOT
+* | [<---] ES_DIGACC                      TYPE        CUAN_S_DA_EXT
+* | [!CX!] CX_CUAN_DIGITAL_ACCOUNT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD fill_digacc_figure.
+
+    DATA:
+      lv_subscribe_key TYPE      /bobf/conf_key,
+      lt_subscribers   TYPE      cuan_t_da_member,
+      lv_rate          TYPE      cuan_digital_account_rate,
+      lv_new_mem       TYPE      int4,
+      lv_total_num     TYPE      int4,
+      lv_first_current TYPE      syst_datum,
+      lv_first_next    TYPE      syst_datum,
+      ls_sql_cds       TYPE      cmkt_dasubscrq,
+      ls_subscribe     TYPE      cuan_s_da_member,
+      lt_da_member     TYPE      cuan_t_da_cds_member,
+      lr_exproting_cds  TYPE REF TO cuan_s_da_cds_member,
+      lt_data_cds      TYPE TABLE OF     cmkt_dasubscrq,
+      ls_da_sub_count  LIKE LINE OF MT_DA_MEMBER.
+
+
+    CLEAR : es_digacc ,lv_subscribe_key.
+
+    TRY .
+
+        MOVE-CORRESPONDING is_root TO es_digacc.
+        CALL METHOD me->get_first_day
+          EXPORTING
+            iv_months              = 1
+            iv_init_date           = sy-datum
+          IMPORTING
+            ov_first_current_month = lv_first_current
+            ov_first_next_month    = lv_first_next.
+
+        lv_subscribe_key = is_root-key.
+
+        READ TABLE mt_da_member WITH KEY account_key = is_root-key INTO ls_da_sub_count.
+
+        es_digacc-totalnum = ls_da_sub_count-count.
+        lv_total_num = es_digacc-totalnum.
+
+        CLEAR lv_rate.
+        CLEAR lv_new_mem.
+
+        IF lv_total_num > 0.
+          SELECT netnumberoffollowers FROM cmkt_dasubscrq( p_enddate = @lv_first_next, p_startdate = @lv_first_current )
+            WHERE digitalaccountuuid = @is_root-key
+            INTO CORRESPONDING FIELDS OF TABLE @lt_data_cds.
+
+          lv_new_mem = 0.
+          LOOP AT lt_data_cds INTO ls_sql_cds.
+            lv_new_mem = lv_new_mem + ls_sql_cds-netnumberoffollowers.
+          ENDLOOP.
+
+          IF lv_new_mem = lv_total_num.
+            lv_rate = 1.
+          ELSE.
+            lv_rate = lv_new_mem / ( lv_total_num - lv_new_mem ).
+          ENDIF.
+        ENDIF.
+        es_digacc-rate = lv_rate  .
+        es_digacc-newmem = lv_new_mem.
+
+      CATCH cx_cuan_digital_account INTO DATA(lx_ex).
+        RAISE EXCEPTION lx_ex.
+    ENDTRY.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method CL_CUAN_DIGACC_API->FILL_DIGACC_INFO
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_EXTEND_FLAG                 TYPE        ABAP_BOOL (default =ABAP_FALSE)
+* | [--->] IS_ROOT                        TYPE        CUAN_S_DA_ROOT
+* | [<---] ES_DIGACC                      TYPE        CUAN_S_DA_EXT
+* | [<---] ET_CREDENTIAL                  TYPE        CUAN_T_EXT_TO_DA
+* | [!CX!] CX_CUAN_DIGITAL_ACCOUNT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD fill_digacc_info.
+    DATA:
+        lr_digacc_impl TYPE REF TO if_cuan_digital_account.
+    DATA:
+         lr_digacc_api     TYPE REF TO   cl_cuan_digacc_api.
+    CLEAR es_digacc.
+
+    TRY .
+
+******* the field iv_extend_flag is used to distinguish when retrieve data for BO or Odata
+******* if iv_extend_flag = abap_true, then for odata, else do nothing
+
+        IF iv_extend_flag = abap_true.
+          CALL METHOD me->fill_digacc_figure(
+            EXPORTING
+              is_root   = is_root
+            IMPORTING
+              es_digacc = es_digacc ).
+          CALL METHOD me->get_inbound_service_path(
+            EXPORTING
+              iv_da_key = is_root-key
+            RECEIVING
+              rv_path   = es_digacc-rv_path ).
+*          CALL METHOD me->get_digacc_impl_by_type(
+*            EXPORTING
+*              iv_da_type = is_root-digacc_type
+*            RECEIVING
+*              er_conn    = lr_digacc_impl ).
+*          IF lr_digacc_impl IS BOUND.
+*            CALL METHOD lr_digacc_impl->get_icon_path(
+*              EXPORTING
+*                is_root   = is_root
+*              IMPORTING
+*                es_digacc = es_digacc ).
+*          ENDIF.
+        ENDIF.
+
+*****For avatar is not initial, we need to assign to icon_url
+        IF NOT es_digacc-avatar IS INITIAL.
+          DATA : lv_len TYPE i.
+          lv_len =  strlen( es_digacc-avatar ).
+          IF  lv_len < 255 .
+            es_digacc-icon_url = substring( val = es_digacc-avatar off = 0 len = lv_len ).
+          ELSE.
+            es_digacc-icon_url = substring( val = es_digacc-avatar off = 0 len = 254 ).
+          ENDIF.
+        ENDIF.
+
+      CATCH cx_cuan_digital_account INTO DATA(lx_ex).
+        RAISE EXCEPTION lx_ex.
+    ENDTRY.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_DIGACC_API->GET_DA_CREDENTIALS
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_KEY                         TYPE        /BOBF/CONF_KEY
+* | [--->] IV_BO                          TYPE        BOOLE_D (default =ABAP_TRUE)
+* | [--->] IS_DIGACC                      TYPE        CUAN_S_DA_ROOT(optional)
+* | [<---] ET_CREDENTIAL                  TYPE        CUAN_T_EXT_TO_DA
+* | [<---] EV_UPDATE                      TYPE        BOOLE_D
+* | [!CX!] CX_CUAN_DIGITAL_ACCOUNT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_da_credentials.
+
+    DATA:
+      lr_data_prov   TYPE REF TO cl_cuan_digacc_data_prov,
+      lt_key_tab     TYPE /iwbep/t_mgw_tech_pairs,
+      lt_key         TYPE    /bobf/t_frw_key,
+      lo_service_mgr TYPE REF TO /bobf/if_tra_service_manager.
+    DATA:lt_da_ext_attr TYPE STANDARD TABLE OF cuan_s_ext_to_da,
+         ls_da_ext_attr LIKE LINE OF lt_da_ext_attr,
+         lt_da_root     TYPE    cuan_t_da_root,
+         ls_da_root     LIKE LINE OF lt_da_root,
+         lv_data        TYPE string.
+    DATA:lt_data        TYPE STANDARD TABLE OF cuand_da_ext_atr.
+
+    CLEAR: lt_data,lt_da_ext_attr,et_credential,lt_key,ev_update.
+    APPEND VALUE #( key = iv_key ) TO lt_key.
+
+    IF iv_bo = abap_true.
+      lo_service_mgr ?= /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_digital_account_c=>sc_bo_key ).
+      CALL METHOD lo_service_mgr->retrieve_by_association
+        EXPORTING
+          iv_node_key    = if_cuan_digital_account_c=>sc_node-root
+          it_key         = lt_key
+          iv_association = if_cuan_digital_account_c=>sc_association-root-extended
+          iv_fill_data   = abap_true
+        IMPORTING
+          eo_message     = DATA(lo_message)
+          et_data        = lt_da_ext_attr.
+    ELSE.
+      SELECT * FROM cuand_da_ext_atr CLIENT SPECIFIED INTO CORRESPONDING FIELDS OF TABLE lt_data WHERE parent_key = iv_key. "#EC CI_NOFIELD
+    ENDIF.
+
+    IF lt_da_ext_attr IS NOT INITIAL.
+      LOOP AT lt_da_ext_attr INTO ls_da_ext_attr.
+        CLEAR :lv_data.
+        IF ls_da_ext_attr-attribute_secure_ref IS NOT INITIAL.
+          TRY .
+              CALL METHOD cl_cuan_digacc_prov=>sec_read_api
+                EXPORTING
+                  iv_id   = ls_da_ext_attr-attribute_secure_ref
+                IMPORTING
+                  ev_data = lv_data.
+              IF lv_data IS NOT INITIAL.
+                ls_da_ext_attr-attribute_value = lv_data.
+              ENDIF.
+            CATCH cx_cuan_digital_account.
+              "please maintain credential fields in front-end
+          ENDTRY.
+        ENDIF.
+        MODIFY lt_da_ext_attr FROM ls_da_ext_attr.
+      ENDLOOP.
+      et_credential = lt_da_ext_attr.
+    ELSEIF lt_data IS NOT INITIAL.
+      LOOP AT lt_data INTO DATA(ls_data).
+        CLEAR :lv_data,ls_da_ext_attr.
+        IF ls_data-attribute_secure_ref IS NOT INITIAL.
+          TRY .
+              CALL METHOD cl_cuan_digacc_prov=>sec_read_api
+                EXPORTING
+                  iv_id     = ls_data-attribute_secure_ref
+                  iv_client = ls_data-mandt
+                IMPORTING
+                  ev_data   = lv_data.
+              ls_data-attribute_value = lv_data.
+              MOVE-CORRESPONDING ls_data TO ls_da_ext_attr.
+              ls_da_ext_attr-key = ls_data-db_key.
+            CATCH cx_cuan_digital_account.
+              "please maintain credential fields in front-end
+          ENDTRY.
+        ELSE.
+          MOVE-CORRESPONDING ls_data TO ls_da_ext_attr.
+          ls_da_ext_attr-key = ls_data-db_key.
+        ENDIF.
+        APPEND ls_da_ext_attr TO lt_da_ext_attr .
+      ENDLOOP.
+      et_credential = lt_da_ext_attr.
+    ELSE.
+
+*migrate old wechat account
+      IF is_digacc IS INITIAL.
+        IF lo_service_mgr IS NOT BOUND.
+          lo_service_mgr ?= /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_digital_account_c=>sc_bo_key ).
+        ENDIF.
+        lo_service_mgr->retrieve(
+                       EXPORTING
+                         iv_node_key   =   if_cuan_digital_account_c=>sc_node-root
+                         it_key        =   lt_key
+                         iv_edit_mode  =   /bobf/if_conf_c=>sc_edit_read_only
+                       IMPORTING
+                         et_data         = lt_da_root ).
+      ELSE.
+        APPEND is_digacc TO lt_da_root.
+      ENDIF.
+******Get credentials for old WeChat Account******
+      CLEAR:lv_data.
+      READ TABLE lt_da_root INTO ls_da_root INDEX 1.
+      IF sy-subrc = 0.
+        APPEND VALUE #( attribute_name = 'APP_ID'           attribute_value = ls_da_root-api_user_id ) TO lt_da_ext_attr.
+        APPEND VALUE #( attribute_name = 'APP_SECRET'       attribute_value = ls_da_root-api_user_pw ) TO lt_da_ext_attr.
+        APPEND VALUE #( attribute_name = 'HAND_SHAKE_TOKEN' attribute_value = ls_da_root-inbound_token ) TO lt_da_ext_attr.
+        TRY .
+            CALL METHOD cl_cuan_digacc_prov=>sec_read_api
+              EXPORTING
+                iv_id   = ls_da_root-secsto_outtoken
+                iv_dir  = cl_cuan_digacc_prov=>gc_prefix_subout
+              IMPORTING
+                ev_data = lv_data.
+            APPEND VALUE #( attribute_name = 'ACCESS_TOKEN' attribute_value = lv_data ) TO lt_da_ext_attr.
+          CATCH cx_cuan_digital_account.
+            "please maintain credential fields in front-end
+        ENDTRY.
+      ENDIF.
+      et_credential = lt_da_ext_attr.
+    ENDIF.
+
+    IF ls_da_root-digacc_type = 'WEC_SERACC' OR ls_da_root-digacc_type = 'WEC_SUBACC'.
+      TRY.
+          CALL METHOD me->migrate_da_to_ext
+            EXPORTING
+              it_da_root = lt_da_root.
+        CATCH cx_cuan_digital_account .
+      ENDTRY.
+    ENDIF.
+
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_DIGACC_API->GET_DIGACCS_BY_COMM_MEDIUM
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_COMM_MEDIUM                 TYPE        CUAN_CE_COMM_MEDIUM
+* | [--->] IV_ACTIVE                      TYPE        CHAR1
+* | [<---] ET_DIGACC                      TYPE        CUAN_T_DA_ROOT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_digaccs_by_comm_medium.
+
+    DATA:ls_selpar  TYPE          /bobf/s_frw_query_selparam,
+         lt_selpar  TYPE TABLE OF /bobf/s_frw_query_selparam,
+         ls_da_root TYPE cuan_s_da_root,
+         lt_da_root TYPE cuan_t_da_root,
+         lt_trq_key TYPE /bobf/t_frw_key,
+         lt_da_type TYPE TABLE OF cuanc_da_type.
+
+    DATA(lo_service_mgr)    = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_digital_account_c=>sc_bo_key ).
+
+    CLEAR et_digacc.
+    SELECT * FROM cuanc_da_type INTO CORRESPONDING FIELDS OF TABLE lt_da_type WHERE comm_medium = iv_comm_medium AND active = 'X'.
+
+    LOOP AT lt_da_type INTO DATA(ls_da_type).
+      CLEAR ls_selpar.
+      ls_selpar-attribute_name = 'DIGACC_TYPE'.
+      ls_selpar-sign = 'I'.
+      ls_selpar-option = 'EQ'.
+      ls_selpar-low = ls_da_type-da_type_id.
+      APPEND ls_selpar TO lt_selpar.
+    ENDLOOP.
+
+    CLEAR ls_selpar.
+    IF iv_active = 'X'.
+      ls_selpar-attribute_name = 'STATUS'.
+      ls_selpar-sign = 'I'.
+      ls_selpar-option = 'EQ'.
+      ls_selpar-low = '2'.
+      APPEND ls_selpar TO lt_selpar.
+    ENDIF.
+
+    lo_service_mgr->query(
+    EXPORTING
+      iv_query_key            = if_cuan_digital_account_c=>sc_query-root-select_all
+      it_selection_parameters = lt_selpar
+      iv_fill_data            = abap_true
+    IMPORTING
+      et_data                 = et_digacc
+      et_key                  = lt_trq_key ).
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method CL_CUAN_DIGACC_API->GET_DIGACC_IMPL_BY_TYPE
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DA_TYPE                     TYPE        CUAN_DIGITAL_ACCOUNT_TYPE
+* | [<-()] ER_CONN                        TYPE REF TO IF_CUAN_DIGITAL_ACCOUNT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_digacc_impl_by_type.
+
+    DATA:
+*      lv_class        TYPE        string,
+      ls_type_impl TYPE        ts_typeimpl,
+      lr_typedesc  TYPE REF TO cl_abap_typedescr.
+
+*****************return different implemation according type**************************
+    CLEAR er_conn.
+    READ TABLE mt_type_impl INTO ls_type_impl WITH KEY digacc_type = iv_da_type.
+
+    IF sy-subrc = 0.
+      er_conn = ls_type_impl-digacc_impl.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method CL_CUAN_DIGACC_API->GET_FIRST_DAY
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_MONTHS                      TYPE        INT4
+* | [--->] IV_INIT_DATE                   TYPE        SY-DATUM
+* | [<---] OV_FIRST_CURRENT_MONTH         TYPE        SY-DATUM
+* | [<---] OV_FIRST_NEXT_MONTH            TYPE        SY-DATUM
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_first_day.
+"get the first day of numner n month and next month
+"eg when n = 1, input 20170620, then we can get
+" the first day of this month 20170601,
+"then first day of next month 20170701
+
+    DATA:
+      BEGIN OF ls_dat,
+            yyyy(4) ,
+            mm(2) ,
+            tt(2) ,
+      END OF ls_dat,
+      lv_newmm    TYPE p,
+      lv_diffyyyy TYPE p,
+      lv_first_current TYPE  sy-datum,
+      lv_first_next    TYPE  sy-datum.
+
+    CLEAR: ov_first_current_month,ov_first_next_month.
+
+    WRITE:  iv_init_date+0(4) TO   ls_dat-yyyy,
+            iv_init_date+4(2) TO   ls_dat-mm.
+
+    WRITE:  iv_init_date+0(4) TO  lv_first_current+0(4),
+            iv_init_date+4(2) TO  lv_first_current+4(2),
+            '01' TO  lv_first_current+6(2).
+
+    ov_first_current_month = lv_first_current.
+
+* if month is 12, then year add 1, else year keey the same
+* month 01 - 09 is diffenetn from 10 - 12
+    lv_diffyyyy =   ( ls_dat-mm + iv_months - 1 ) DIV 12.
+    lv_newmm    =   ( ls_dat-mm + iv_months - 1 ) MOD 12 + 1.
+    ls_dat-yyyy = ls_dat-yyyy +  lv_diffyyyy.
+
+    IF lv_newmm < 10.
+      WRITE '0' TO  ls_dat-mm+0(1).
+      WRITE lv_newmm TO  ls_dat-mm+1(1).
+    ELSE.
+      WRITE lv_newmm TO  ls_dat-mm.
+    ENDIF.
+
+    WRITE:  ls_dat-yyyy TO  lv_first_next+0(4),
+            ls_dat-mm TO  lv_first_next+4(2),
+            '01' TO  lv_first_next+6(2).
+
+    ov_first_next_month = lv_first_next.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method CL_CUAN_DIGACC_API->GET_INBOUND_SERVICE_PATH
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DA_KEY                      TYPE        /BOBF/CONF_KEY
+* | [<-()] RV_PATH                        TYPE        STRING
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_inbound_service_path.
+
+    DATA lv_path TYPE string.
+
+    IF iv_da_key IS NOT INITIAL.
+
+      CALL METHOD cl_cuan_tc_tools=>is_s4hana_cloud_deployment
+        RECEIVING
+          rv_is_s4h_cloud = DATA(lv_mark).
+      IF lv_mark = abap_true.
+        lv_path = c_ntwrk_inbound_service_id_pc.
+      ELSE.
+        lv_path = c_ntwrk_inbound_service_id_op.
+      ENDIF.
+
+      cl_http_server=>get_location(
+        EXPORTING
+          application   = lv_path
+        IMPORTING
+          host          = DATA(lv_host)
+          port          = DATA(lv_port)
+          out_protocol  = DATA(lv_protocol) ).
+
+      rv_path = lv_protocol && |://| && lv_host && |:| && lv_port
+                 && lv_path  && |/| && iv_da_key.
+    ELSE.
+      RETURN.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method CL_CUAN_DIGACC_API=>GET_INSTANCE
+* +-------------------------------------------------------------------------------------------------+
+* | [<-()] RO_INSTANCE                    TYPE REF TO CL_CUAN_DIGACC_API
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_instance.
+
+*Generate instance For API.
+    IF mo_instance IS NOT BOUND.
+      CREATE OBJECT mo_instance.
+    ENDIF.
+
+    ro_instance = mo_instance.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_DIGACC_API->GET_SUBSCRIBERS
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DA_KEY                      TYPE        /BOBF/CONF_KEY
+* | [--->] IT_SELECT_OPTIONS              TYPE        HPA_T_READ_ACCESS_SEL_OPTIONS(optional)
+* | [--->] IS_OPTIONS                     TYPE        HPA_S_READ_ACCESS_OPTIONS(optional)
+* | [--->] IV_SEARCH_STRING               TYPE        HPA_SEARCH_STRING(optional)
+* | [<---] ET_EXPORTING                   TYPE        CUAN_T_DA_MEMBER
+* | [!CX!] CX_CUAN_DIGITAL_ACCOUNT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_subscribers.
+
+    DATA:
+      lo_read_access    TYPE REF TO if_hpa_read_access,
+      lt_filter_names   TYPE /bobf/t_frw_name,
+      lv_name           TYPE string,
+      ls_exproting      TYPE cuan_s_da_member,
+      lt_exproting_cds  TYPE cuan_t_da_cds_member,
+      lr_exproting_cds  TYPE REF TO cuan_s_da_cds_member,
+      ls_options        TYPE hpa_s_read_access_options,
+      ls_select_option  TYPE hpa_s_read_access_sel_option,
+      ls_select_options TYPE hpa_s_read_access_sel_options,
+      lt_select_options TYPE hpa_t_read_access_sel_options.
+
+    CLEAR : et_exporting[],ls_select_option.
+
+**************************Prepare Query Conditions*****************************************************************
+**************************1. Prepare Key  *************************************************************************
+    MOVE-CORRESPONDING it_select_options TO lt_select_options.
+    ls_select_options-attribute_name = 'DigitalAccountUUID'.
+    ls_select_option-sign = 'I'.
+    ls_select_option-option = 'EQ'.
+    ls_select_option-low = iv_da_key.
+    APPEND ls_select_option TO ls_select_options-select_options.
+    APPEND ls_select_options TO lt_select_options.
+
+
+**************************Prepare Options, and set authorization check*********************************************
+    MOVE-CORRESPONDING is_options TO ls_options.
+*    ls_options-skip_auth_check = abap_true.
+
+
+**************************Prepare Select Fields********************************************************************
+    lv_name = 'FULLNAME'.
+    APPEND lv_name TO lt_filter_names.
+    lv_name = 'COUNTRYFREETEXT'.
+    APPEND lv_name TO lt_filter_names.
+    lv_name = 'REGIONFREETEXT'.
+    APPEND lv_name TO lt_filter_names.
+    lv_name = 'CITYNAME'.
+    APPEND lv_name TO lt_filter_names.
+    lv_name = 'STREETNAME'.
+    APPEND lv_name TO lt_filter_names.
+    lv_name = 'ADDRESSHOUSENUMBER'.
+    APPEND lv_name TO lt_filter_names.
+    lv_name = 'EMAILADDRESS'.
+    APPEND lv_name TO lt_filter_names.
+    lv_name = 'MOBILENUMBER'.
+    APPEND lv_name TO lt_filter_names.
+    lv_name = 'INTERACTIONCONTACTUUID'.
+    APPEND lv_name TO lt_filter_names.
+
+
+
+**************************Initial Read Class, Query*****************************************************************
+    TRY .
+        lo_read_access = cl_hpa_read_access_factory=>get_instance(
+                         iv_bo_key       = if_cuan_digital_account_c=>sc_bo_key
+                         iv_query_key    = if_cuan_digital_account_c=>sc_query-root-ic_members ).
+
+        lo_read_access->read(
+          EXPORTING
+           it_select_options       =  lt_select_options
+           is_options              =  ls_options
+           iv_fill_data            =  abap_true
+           iv_search_string        =  iv_search_string
+           iv_fill_info            =  abap_true
+           it_requested_field      =  lt_filter_names
+
+        IMPORTING
+           et_data                 =  lt_exproting_cds ).
+
+      CATCH cx_hpa_authorization INTO DATA(lx_au).
+        RAISE EXCEPTION TYPE cx_cuan_digital_account
+          EXPORTING
+            textid = cx_cuan_digital_account=>authorizatoin_check_error.
+      CATCH cx_sql_exception INTO DATA(lx_sql).
+        RAISE EXCEPTION TYPE cx_cuan_digital_account
+          EXPORTING
+            textid = cx_cuan_digital_account=>hana_read_error.
+    ENDTRY.
+
+
+**************************Structure Convert For Outbound*************************************************************
+    LOOP AT lt_exproting_cds REFERENCE INTO lr_exproting_cds.
+      CLEAR ls_exproting.
+      ls_exproting-subscriber_name    =     lr_exproting_cds->fullname.
+      ls_exproting-city               =     lr_exproting_cds->cityname.
+      ls_exproting-contact_key        =     lr_exproting_cds->interactioncontactuuid.
+      ls_exproting-name_text          =     lr_exproting_cds->fullname.
+      ls_exproting-telnr_mobile       =     lr_exproting_cds->mobilenumber.
+      ls_exproting-email              =     lr_exproting_cds->emailaddress.
+      ls_exproting-street             =     lr_exproting_cds->streetname.
+      ls_exproting-house_number       =     lr_exproting_cds->addresshousenumber.
+      ls_exproting-country_ft         =     lr_exproting_cds->countryfreetext.
+      ls_exproting-region_ft          =     lr_exproting_cds->regionfreetext.
+      APPEND ls_exproting TO et_exporting .
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_DIGACC_API->GET_SUBSCRIBERS_ALL
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IT_DA_KEY                      TYPE        /BOBF/T_FRW_KEY(optional)
+* | [--->] IV_DA_KEY                      TYPE        /BOBF/CONF_KEY(optional)
+* | [--->] IT_SELECT_OPTIONS              TYPE        HPA_T_READ_ACCESS_SEL_OPTIONS(optional)
+* | [--->] IS_OPTIONS                     TYPE        HPA_S_READ_ACCESS_OPTIONS(optional)
+* | [--->] IV_SEARCH_STRING               TYPE        HPA_SEARCH_STRING(optional)
+* | [<---] ET_EXPORTING                   TYPE        CUAN_T_DA_MEMBER
+* | [<---] ET_EXPORTING_CDS               TYPE        CUAN_T_DA_CDS_MEMBER
+* | [!CX!] CX_CUAN_DIGITAL_ACCOUNT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD GET_SUBSCRIBERS_ALL.
+
+    SELECT digitalaccountuuid, COUNT( DISTINCT interactioncontactuuid )
+      FROM cuan_daicsearch
+      GROUP BY digitalaccountuuid
+      INTO TABLE @mt_da_member.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_DIGACC_API->MIGRATE_DA_TO_EXT
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IT_DA_ROOT                     TYPE        CUAN_T_DA_ROOT
+* | [!CX!] CX_CUAN_DIGITAL_ACCOUNT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD migrate_da_to_ext.
+    DATA:lv_guid         TYPE    guid_32,
+         lv_data         TYPE string,
+         ls_modification TYPE    /bobf/s_frw_modification,
+         lt_modification TYPE    /bobf/t_frw_modification,
+         lt_ext_da       TYPE cuan_t_ext_da,
+         ls_ext_da       TYPE cuan_s_ext_da,
+         lt_ext_da_attr  TYPE cuan_t_ext_to_da,
+         ls_ext_da_attr  TYPE REF TO cuan_s_ext_to_da.
+
+    DATA:lt_key         TYPE    /bobf/t_frw_key,
+         lo_service_mgr TYPE REF TO /bobf/if_tra_service_manager.
+    DATA:lt_da_ext_attr TYPE STANDARD TABLE OF cuan_s_ext_to_da,
+         ls_da_ext_attr LIKE LINE OF lt_da_ext_attr.
+
+
+    mo_transaction_mgr->cleanup( ).
+
+    TRY .
+        LOOP AT it_da_root INTO DATA(ls_da_root).
+
+*insert records to digital account extended attribute table for old wechat account
+*insert API_SECRET
+          CLEAR:ls_modification,lv_guid,lv_data,ls_ext_da_attr.
+          CREATE DATA ls_ext_da_attr.
+          lv_guid = cl_system_uuid=>create_uuid_x16_static( ).
+          lv_data = ls_da_root-api_user_pw.
+          CALL METHOD me->modify_sec( EXPORTING iv_guid = lv_guid iv_data = lv_data iv_method = 'INSERT').
+
+          ls_ext_da_attr->digital_account_key = ls_da_root-key.
+          ls_ext_da_attr->parent_key = ls_da_root-key.
+          ls_ext_da_attr->attribute_name = 'APP_SECRET'.
+          ls_ext_da_attr->attribute_secure_ref = lv_guid.
+          ls_ext_da_attr->key         =   /bobf/cl_frw_factory=>get_new_key( ).
+
+          ls_modification-data        =   ls_ext_da_attr.
+          ls_modification-change_mode =   /bobf/if_frw_c=>sc_modify_create.
+          ls_modification-node        =   if_cuan_digital_account_c=>sc_node-extended.
+          ls_modification-key         =   ls_ext_da_attr->key.
+          ls_modification-association = if_cuan_digital_account_c=>sc_association-extended-to_root.
+          ls_modification-source_node = if_cuan_digital_account_c=>sc_node-root.
+          ls_modification-source_key  = ls_da_root-key.
+          APPEND ls_modification TO lt_modification.
+
+*insert APP_ID
+          CLEAR:ls_modification,lv_guid,lv_data,ls_ext_da_attr.
+          CREATE DATA ls_ext_da_attr.
+          ls_ext_da_attr->attribute_value = ls_da_root-api_user_id.
+          ls_ext_da_attr->digital_account_key = ls_da_root-key.
+          ls_ext_da_attr->parent_key = ls_da_root-key.
+          ls_ext_da_attr->attribute_name = 'APP_ID'.
+          ls_ext_da_attr->key         =   /bobf/cl_frw_factory=>get_new_key( ).
+
+          ls_modification-data        =   ls_ext_da_attr.
+          ls_modification-change_mode =   /bobf/if_frw_c=>sc_modify_create.
+          ls_modification-node        =   if_cuan_digital_account_c=>sc_node-extended.
+          ls_modification-key         =   ls_ext_da_attr->key.
+          ls_modification-association = if_cuan_digital_account_c=>sc_association-extended-to_root.
+          ls_modification-source_node = if_cuan_digital_account_c=>sc_node-root.
+          ls_modification-source_key  = ls_da_root-key.
+          APPEND ls_modification TO lt_modification.
+
+*insert ACCESS_TOKEN
+          CLEAR:ls_modification,lv_guid,lv_data,ls_ext_da_attr.
+          CREATE DATA ls_ext_da_attr.
+
+          IF ls_da_root-secsto_outtoken IS NOT INITIAL.
+            lv_guid = cl_system_uuid=>create_uuid_x16_static( ).
+            TRY .
+                CALL METHOD cl_cuan_digacc_prov=>sec_read_api
+                  EXPORTING
+                    iv_id   = ls_da_root-secsto_outtoken
+                    iv_dir  = cl_cuan_digacc_prov=>gc_prefix_subout
+                  IMPORTING
+                    ev_data = lv_data.
+              CATCH cx_cuan_digital_account.
+            ENDTRY.
+            CALL METHOD me->modify_sec( EXPORTING iv_guid = lv_guid iv_data = lv_data iv_method = 'INSERT').
+
+            ls_ext_da_attr->digital_account_key = ls_da_root-key.
+            ls_ext_da_attr->parent_key = ls_da_root-key.
+            ls_ext_da_attr->attribute_name = 'ACCESS_TOKEN'.
+            ls_ext_da_attr->attribute_secure_ref = lv_guid.
+            ls_ext_da_attr->key         =   /bobf/cl_frw_factory=>get_new_key( ).
+
+            ls_modification-data        =   ls_ext_da_attr.
+            ls_modification-change_mode =   /bobf/if_frw_c=>sc_modify_create.
+            ls_modification-node        =   if_cuan_digital_account_c=>sc_node-extended.
+            ls_modification-key         =   ls_ext_da_attr->key.
+            ls_modification-association = if_cuan_digital_account_c=>sc_association-extended-to_root.
+            ls_modification-source_node = if_cuan_digital_account_c=>sc_node-root.
+            ls_modification-source_key  = ls_da_root-key.
+            APPEND ls_modification TO lt_modification.
+          ENDIF.
+
+*insert HAND_SHAKE_TOKEN
+          CLEAR:ls_modification,lv_guid,lv_data,ls_ext_da_attr.
+          CREATE DATA ls_ext_da_attr.
+          lv_guid = cl_system_uuid=>create_uuid_x16_static( ).
+          lv_data = ls_da_root-inbound_token.
+          CALL METHOD me->modify_sec( EXPORTING iv_guid = lv_guid iv_data = lv_data iv_method = 'INSERT').
+
+          ls_ext_da_attr->digital_account_key = ls_da_root-key.
+          ls_ext_da_attr->parent_key = ls_da_root-key.
+          ls_ext_da_attr->attribute_name = 'HAND_SHAKE_TOKEN'.
+          ls_ext_da_attr->attribute_secure_ref = lv_guid.
+          ls_ext_da_attr->key         =   /bobf/cl_frw_factory=>get_new_key( ).
+
+          ls_modification-data        =   ls_ext_da_attr.
+          ls_modification-change_mode =   /bobf/if_frw_c=>sc_modify_create.
+          ls_modification-node        =   if_cuan_digital_account_c=>sc_node-extended.
+          ls_modification-key         =   ls_ext_da_attr->key.
+          ls_modification-association = if_cuan_digital_account_c=>sc_association-extended-to_root.
+          ls_modification-source_node = if_cuan_digital_account_c=>sc_node-root.
+          ls_modification-source_key  = ls_da_root-key.
+          APPEND ls_modification TO lt_modification.
+
+*insert ORIGINAL_ID
+          CLEAR:ls_modification,lv_guid,lv_data,ls_ext_da_attr.
+          CREATE DATA ls_ext_da_attr.
+          ls_ext_da_attr->attribute_value = ls_da_root-digacc_technical_id.
+          ls_ext_da_attr->digital_account_key = ls_da_root-key.
+          ls_ext_da_attr->parent_key = ls_da_root-key.
+          ls_ext_da_attr->attribute_name = 'ORIGINAL_ID'.
+          ls_ext_da_attr->key         =   /bobf/cl_frw_factory=>get_new_key( ).
+
+          ls_modification-data        =   ls_ext_da_attr.
+          ls_modification-change_mode =   /bobf/if_frw_c=>sc_modify_create.
+          ls_modification-node        =   if_cuan_digital_account_c=>sc_node-extended.
+          ls_modification-key         =   ls_ext_da_attr->key.
+          ls_modification-association = if_cuan_digital_account_c=>sc_association-extended-to_root.
+          ls_modification-source_node = if_cuan_digital_account_c=>sc_node-root.
+          ls_modification-source_key = ls_da_root-key.
+          APPEND ls_modification TO lt_modification.
+
+*create extended attribute by BO
+          mo_service_mgr->modify(
+              EXPORTING it_modification = lt_modification
+              IMPORTING eo_change = DATA(lo_change_c)
+                        eo_message = DATA(lo_message_c) ).
+          CALL METHOD me->save.
+        ENDLOOP.
+      CATCH cx_cuan_digital_account.
+      CATCH cx_uuid_error.
+    ENDTRY.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method CL_CUAN_DIGACC_API->MODIFY_SEC
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DATA                        TYPE        STRING
+* | [--->] IV_GUID                        TYPE        GUID_32
+* | [--->] IV_METHOD                      TYPE        STRING
+* | [!CX!] CX_CUAN_DIGITAL_ACCOUNT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD modify_sec.
+
+    DATA:
+          lt_abap_callstack       TYPE abap_callstack,
+          lr_abap_callstack       TYPE REF TO abap_callstack_line,
+          lv_caller2              TYPE syrepid,
+          lv_caller3              TYPE syrepid,
+          lv_caller4              TYPE syrepid,
+          lv_caller5              TYPE syrepid,
+          lv_data                 TYPE string.
+
+*******************check secyrity storage, no authorization create only the call stack****************
+        CALL FUNCTION 'SYSTEM_CALLSTACK'
+          EXPORTING
+            max_level = 4
+          IMPORTING
+            callstack = lt_abap_callstack.
+
+        IF sy-subrc NE 0.
+          RETURN.
+        ENDIF.
+
+        READ TABLE lt_abap_callstack REFERENCE INTO lr_abap_callstack INDEX 2.
+        lv_caller2 = lr_abap_callstack->*-mainprogram .
+
+        CLEAR lr_abap_callstack->*.
+        READ TABLE lt_abap_callstack REFERENCE INTO lr_abap_callstack INDEX 3.
+        lv_caller3 = lr_abap_callstack->*-mainprogram .
+
+        CLEAR lr_abap_callstack->*.
+        READ TABLE lt_abap_callstack REFERENCE INTO lr_abap_callstack INDEX 4.
+        lv_caller4 = lr_abap_callstack->*-mainprogram .
+
+*       add unit test class in check list
+        IF ( lv_caller2 = 'CL_CUAN_DIGACC_API============CP'
+          AND lv_caller3 ='CL_CUAN_DIGACC_DATA_PROV======CP'
+          AND lv_caller4 = 'CL_CUAN_DIGITAL_ACCOUN_DPC_EXTCP' ) OR
+          ( lv_caller2 = 'CL_CUAN_DIGACC_DATA_PROV======CP'
+          AND lv_caller3 ='CL_AUNIT_TEST_CLASS===========CP'
+          AND lv_caller4 = 'CL_AUNIT_TEST_CLASS===========CP' ) OR
+          ( lv_caller2 = 'CL_CUAN_DIGITAL_ACCOUN_DPC_EXTCP'
+          AND lv_caller3 ='CL_CUAN_DIGITAL_ACCOUN_DPC====CP'
+          AND lv_caller4 = 'CL_CUAN_DIGITAL_ACCOUN_DPC_EXTCP' ) or
+          ( lv_caller2 = 'CL_CUAN_DIGACC_API============CP'
+          AND lv_caller3 = 'CL_CUAN_DIGACC_API============CP'
+          AND lv_caller4 = 'CL_CUAN_DIGACC_API============CP' ).
+        ELSE.
+          RETURN. "For Unit Test, we can ship call stack check
+        ENDIF.
+
+************************save data to DB****************************************************************
+      TRY .
+          CALL METHOD cl_cuan_digacc_prov=>sec_modify_api
+            EXPORTING
+              iv_id       = iv_guid
+              iv_dir      = space"cl_cuan_digacc_prov=>gc_prefix_subin
+              iv_method   = 'INSERT'
+              iv_dasecret = iv_data.
+
+      CATCH cx_cuan_digital_account INTO DATA(lx_ex).
+        RAISE EXCEPTION TYPE cx_cuan_digital_account
+          EXPORTING
+            textid = lx_ex->if_t100_message~t100key.
+    ENDTRY.
+
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_DIGACC_API->QUERY_DIGACC
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IT_SELECT_OPTIONS              TYPE        HPA_T_READ_ACCESS_SEL_OPTIONS(optional)
+* | [--->] IS_OPTIONS                     TYPE        HPA_S_READ_ACCESS_OPTIONS(optional)
+* | [--->] IV_SEARCH_STRING               TYPE        HPA_SEARCH_STRING(optional)
+* | [--->] IV_EXT_WHERE_CONDITIONS        TYPE        HPA_EXT_WHERE_CONDITIONS(optional)
+* | [--->] IT_REQUESTED_FIELD             TYPE        /BOBF/T_FRW_NAME(optional)
+* | [<---] ET_DIGACC                      TYPE        CUAN_T_DA_EXT
+* | [!CX!] CX_CUAN_DIGITAL_ACCOUNT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD query_digacc.
+
+    DATA:
+      lo_read_access   TYPE REF TO if_hpa_read_access,
+      lt_exporting_cds TYPE cuan_t_da_cds_fuzzy_search,
+      lr_exporting_cds TYPE REF TO cuan_s_da_cds_fuzzy_search,
+      ls_da_root       TYPE cuan_s_da_root,
+      lt_da_key        TYPE /bobf/t_frw_key,
+      lt_da_root       TYPE cuan_t_da_root,
+      lr_da_root       TYPE cuan_s_da_root,
+      ls_mkt_area      TYPE hpa_s_mkt_area,
+      lt_mkt_area      TYPE hpa_t_mkt_area,
+      lr_exporting_get TYPE cuan_s_da_root_search,
+      lt_exporting     TYPE cuan_t_da_root_search,
+      lr_exporting     TYPE REF TO cuan_s_da_root_search,
+      ls_type          TYPE cuan_s_da_type,
+      lt_type          TYPE cuan_t_da_type,
+      ls_digacc        TYPE cuan_s_da_ext.
+
+    CLEAR et_digacc.
+
+    TRY.
+
+***************************Use BO Hana Search*********************************************************************
+        lo_read_access = cl_hpa_read_access_factory=>get_instance(
+                     iv_bo_key       =  if_cuan_digital_account_c=>sc_bo_key
+                     iv_query_key    =  if_cuan_digital_account_c=>sc_query-root-search
+                 ).
+
+        lo_read_access->read(
+          EXPORTING
+            it_select_options       =   it_select_options
+            iv_search_string        =   iv_search_string
+            is_options              =   is_options
+            iv_ext_where_conditions =   iv_ext_where_conditions
+            iv_fill_data            =   abap_true
+            it_requested_field      =   it_requested_field
+           IMPORTING
+            et_data                 =   lt_exporting_cds ).
+
+***************no record can get, return nothing******************************************************************
+        IF lines( lt_exporting_cds ) = 0.
+          RETURN.
+        ENDIF.
+
+
+***************************Collect keys For futher Query***********************************************************
+
+
+        LOOP AT lt_exporting_cds REFERENCE INTO lr_exporting_cds.
+          APPEND VALUE #( key = lr_exporting_cds->digitalaccountuuid ) TO lt_da_key.
+        ENDLOOP.
+
+
+***************************Use BO Standard Query*******************************************************************
+        mo_service_mgr->retrieve(
+          EXPORTING
+            iv_node_key   =   if_cuan_digital_account_c=>sc_node-root
+            it_key        =   lt_da_key
+          IMPORTING
+            et_data       =   lt_da_root
+          ).
+
+
+        CLEAR lt_type[].
+        CALL METHOD cl_cuan_da_type_customizing=>get_da_types
+          EXPORTING
+            iv_spras   = sy-langu
+            iv_active  = abap_true
+          IMPORTING
+            et_da_type = lt_type.
+
+****************************Fill Calculate Fields For Gateway**************************************************
+*   filll detailed information and authorization check against market area
+        CLEAR mt_da_member.
+
+        CALL METHOD me->GET_SUBSCRIBERS_ALL( ).
+
+        LOOP AT lt_da_root INTO ls_da_root.
+*         Check Data whether in type table, filter obsolete data
+          READ TABLE lt_type INTO ls_type WITH KEY da_type_id = ls_da_root-digacc_type.
+          IF sy-subrc = 0.
+            CLEAR: ls_digacc.
+            CALL METHOD me->fill_digacc_info(
+              EXPORTING
+                iv_extend_flag = abap_true
+                is_root        = ls_da_root
+              IMPORTING
+                es_digacc      = ls_digacc ).
+            APPEND ls_digacc TO et_digacc.
+          ENDIF.
+        ENDLOOP.
+
+        CLEAR mt_da_member.
+************************refactor old wechat account****************************************
+
+      CATCH cx_sql_exception INTO DATA(lx_ex_sql).
+        RAISE EXCEPTION TYPE cx_cuan_digital_account
+          EXPORTING
+            textid = cx_cuan_digital_account=>hana_read_error.
+      CATCH cx_hpa_authorization INTO DATA(lx_ex_au).
+        RAISE EXCEPTION TYPE cx_cuan_digital_account
+          EXPORTING
+            textid = cx_cuan_digital_account=>authorizatoin_check_error.
+      CATCH cx_cuan_digital_account INTO DATA(lx_ex).
+        RAISE EXCEPTION lx_ex.
+    ENDTRY.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_DIGACC_API->READ_DIGACC
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DA_KEY                      TYPE        /BOBF/CONF_KEY
+* | [--->] IV_FILL_DIGACC_EXT_INFO        TYPE        ABAP_BOOL (default =ABAP_TRUE)
+* | [<---] ES_DIGACC                      TYPE        CUAN_S_DA_EXT
+* | [<---] ET_CREDENTIAL                  TYPE        CUAN_T_EXT_TO_DA
+* | [!CX!] CX_CUAN_DIGITAL_ACCOUNT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD read_digacc.
+* For Read single entry, only key is must
+* When user do not know key, and they can use alternative key to convert as key, then get data.
+    DATA:
+      lt_da_root    TYPE    cuan_t_da_root,
+      ls_da_root    TYPE    cuan_s_da_root,
+      ls_da_cal     TYPE    cuan_s_da_ext,
+      ls_key        TYPE    /bobf/s_frw_key,
+      lt_key        TYPE    /bobf/t_frw_key,
+      lt_failed_key TYPE    /bobf/t_frw_key.
+    DATA:lt_da_ext_attr TYPE STANDARD TABLE OF cuan_s_ext_to_da.
+
+    CLEAR          es_digacc.
+    TRY .
+****************Prepare Keys******************************************************************************
+        ls_key-key = iv_da_key.
+        APPEND ls_key TO lt_key.
+
+****************Query*************************************************************************************
+        mo_service_mgr->retrieve(
+          EXPORTING
+            iv_node_key   =   if_cuan_digital_account_c=>sc_node-root
+            it_key        =   lt_key
+            iv_edit_mode  =   /bobf/if_conf_c=>sc_edit_read_only
+          IMPORTING
+            et_data         = lt_da_root
+            et_failed_key   = lt_failed_key ).
+
+****************Fill figure*********************************************************************************
+        IF lines( lt_da_root ) = 1.
+          READ TABLE lt_da_root INTO ls_da_root INDEX 1.
+          IF iv_fill_digacc_ext_info = abap_true.
+
+            CLEAR mt_da_member.
+
+            CALL METHOD me->GET_SUBSCRIBERS_ALL( ).
+
+            CALL METHOD me->fill_digacc_info(
+              EXPORTING
+                iv_extend_flag = abap_true
+                is_root        = ls_da_root
+              IMPORTING
+                es_digacc      = es_digacc ).
+
+            CLEAR mt_da_member.
+          ELSE.
+            MOVE-CORRESPONDING ls_da_root TO es_digacc.
+          ENDIF.
+
+          CALL METHOD me->get_da_credentials
+            EXPORTING
+              iv_key        = ls_da_root-key
+            IMPORTING
+              et_credential = et_credential.
+
+        ENDIF.
+      CATCH cx_cuan_digital_account INTO DATA(lx_ex).
+        RAISE EXCEPTION lx_ex.
+    ENDTRY.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_DIGACC_API->SAVE
+* +-------------------------------------------------------------------------------------------------+
+* | [<---] EV_REJECTED                    TYPE        BOOLE_D
+* | [<---] EO_CHANGE                      TYPE REF TO /BOBF/IF_TRA_CHANGE
+* | [<---] EO_MESSAGE                     TYPE REF TO /BOBF/IF_FRW_MESSAGE
+* | [<---] ET_REJECTING_BO_KEY            TYPE        /BOBF/T_FRW_KEY2
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  method SAVE.
+
+    mo_transaction_mgr->save( IMPORTING
+                            ev_rejected = ev_rejected
+                            eo_change   = eo_change
+                            eo_message  = eo_message
+                            et_rejecting_bo_key = et_rejecting_bo_key ).
+
+  endmethod.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_DIGACC_API->UPDATE_DIGACC
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IS_ROOT                        TYPE        CUAN_S_DA_ROOT
+* | [<---] EO_MESSAGE                     TYPE REF TO /BOBF/IF_FRW_MESSAGE
+* | [<---] EO_CHANGE                      TYPE REF TO /BOBF/IF_TRA_CHANGE
+* | [!CX!] CX_CUAN_DIGITAL_ACCOUNT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD update_digacc.
+
+    DATA:
+      ls_da_read        TYPE    cuan_s_da_root,
+      ls_digacc         TYPE    cuan_s_da_root,
+      lt_da_root        TYPE    cuan_t_da_root,
+      ls_key            TYPE    /bobf/s_frw_key,
+      lt_key            TYPE    /bobf/t_frw_key,
+      lt_failed_key     TYPE    /bobf/t_frw_key,
+      lv_message        TYPE    string,
+      lv_data           TYPE    string,
+      lv_type_msg       TYPE    string,
+      lv_token          TYPE    string,
+      ls_modification   TYPE    /bobf/s_frw_modification,
+      lt_modification   TYPE    /bobf/t_frw_modification,
+      lt_abap_callstack TYPE    abap_callstack,
+      lv_business_error TYPE    bapi_msg,
+      lr_abap_callstack TYPE REF TO   abap_callstack_line,
+      ls_da             TYPE REF TO   cuan_s_da_root,
+      lr_digacc_impl    TYPE REF TO   if_cuan_digital_account,
+      lt_comp           TYPE STANDARD TABLE OF dd03p.
+
+    DATA:lt_da_ext           TYPE cuan_t_ext_da,
+         ls_da_ext           TYPE cuan_s_ext_da,
+         lr_da_ext           TYPE REF TO cuan_s_ext_to_da,
+         lv_app_secret       TYPE string,
+         lv_hand_shake_token TYPE string,
+         lv_app_id           TYPE string,
+         lv_original_id      TYPE string.
+    "lv_data             TYPE string.
+    DATA:lt_da_ext_attr TYPE STANDARD TABLE OF cuan_s_ext_to_da.
+    DATA:
+lr_digacc_api     TYPE REF TO   cl_cuan_digacc_api.
+**********************************************************************************************************
+
+    mo_transaction_mgr->cleanup( ).
+
+**********************************************************************************************************
+* Before Update, do connection test
+    TRY .
+        MOVE-CORRESPONDING is_root TO ls_digacc.
+        IF ls_digacc-status = if_cuan_digital_account=>gc_digacc_status_active. "status equal active,
+          "IF ls_digacc-digitalaccountextattribute IS NOT INITIAL.
+          CALL METHOD me->get_digacc_impl_by_type
+            EXPORTING
+              iv_da_type = is_root-digacc_type
+            RECEIVING
+              er_conn    = lr_digacc_impl.
+          IF lr_digacc_impl IS BOUND.
+            CALL METHOD lr_digacc_impl->additional_check
+              EXPORTING
+                is_digacc = ls_digacc.
+            CALL METHOD lr_digacc_impl->connection_test
+              EXPORTING
+                is_digacc = ls_digacc
+              IMPORTING
+                ev_token  = lv_token
+                es_digacc = ls_da_read.
+          ENDIF.
+        ENDIF.
+
+
+*****************************************************************************************************************
+*Prepare digital account data for update
+        CREATE DATA ls_da.
+        MOVE-CORRESPONDING ls_digacc TO ls_da->*.
+        ls_key-key = ls_da->key.
+        APPEND ls_key TO lt_key.
+
+******************Get Initial Data, For Check, Compare Secure Storage********************************************
+        IF ls_digacc-status <> if_cuan_digital_account=>gc_digacc_status_inactive. "inactive, no set
+          mo_service_mgr->retrieve(
+                            EXPORTING
+                              iv_node_key   =   if_cuan_digital_account_c=>sc_node-root
+                              it_key        =   lt_key
+                              iv_edit_mode  =   /bobf/if_conf_c=>sc_edit_read_only
+                            IMPORTING
+                              et_data         = lt_da_root
+                              et_failed_key   = lt_failed_key ).
+
+          IF lines( lt_da_root ) <> 1.
+            RAISE EXCEPTION TYPE cx_cuan_digital_account
+              EXPORTING
+                textid = cx_cuan_digital_account=>cx_cuan_digital_account.
+          ENDIF.
+
+**************************************************** Get First Entry*******************************************
+          CLEAR ls_da_read.
+          MOVE-CORRESPONDING lt_da_root[ 1 ] TO ls_da_read.
+          lt_da_ext = ls_digacc-digitalaccountextattribute.
+
+          lr_digacc_api = cl_cuan_digacc_api=>get_instance( ).
+          CALL METHOD lr_digacc_api->get_da_credentials
+            EXPORTING
+              iv_key        = ls_digacc-key
+              is_digacc     = ls_da_read
+            IMPORTING
+              et_credential = lt_da_ext_attr
+              ev_update     = DATA(lv_update).
+          IF lt_da_ext_attr IS NOT INITIAL.
+            CREATE DATA lr_da_ext.
+            LOOP AT lt_da_ext_attr INTO DATA(ls_da_ext_attr).
+              CLEAR ls_modification.
+              READ TABLE lt_da_ext INTO ls_da_ext WITH KEY attribute_name = ls_da_ext_attr-attribute_name.
+              IF sy-subrc = 0 AND ls_da_ext_attr-attribute_value <> ls_da_ext-attribute_value.
+                IF  ls_da_ext_attr-attribute_secure_ref IS NOT INITIAL.
+                  CALL METHOD me->modify_sec(
+                    EXPORTING
+                      iv_guid   = ls_da_ext_attr-attribute_secure_ref
+                      iv_data   = ls_da_ext-attribute_value
+                      iv_method = 'UPDATE' ). "method: update
+                ELSE.
+                  MOVE-CORRESPONDING ls_da_ext_attr TO lr_da_ext->*.
+                  APPEND if_cuan_digital_account_c=>sc_node_attribute-extended-attribute_value   TO ls_modification-changed_fields.
+                  lr_da_ext->attribute_value = ls_da_ext-attribute_value.
+                  ls_modification-data        =     lr_da_ext.
+                  ls_modification-change_mode =     /bobf/if_frw_c=>sc_modify_update.
+                  ls_modification-node        =     if_cuan_digital_account_c=>sc_node-extended.
+                  ls_modification-key         =     ls_da_ext_attr-key.
+                  APPEND ls_modification TO lt_modification.
+                ENDIF.
+              ENDIF.
+            ENDLOOP.
+
+            IF lt_modification[] IS NOT INITIAL.
+              mo_service_mgr->modify( EXPORTING it_modification = lt_modification
+                                      IMPORTING eo_change   = eo_change
+                                                eo_message  = eo_message ).
+              CALL METHOD me->save.
+              RETURN.
+            ENDIF.
+          ENDIF.
+          CLEAR:lt_modification[],ls_modification.
+        ENDIF.
+
+******************Prepare Data For modify***********************************************************
+        IF ls_digacc-status IS NOT INITIAL.
+          ls_modification-data        =     ls_da.
+          ls_modification-change_mode =     /bobf/if_frw_c=>sc_modify_update.
+          ls_modification-node        =     if_cuan_digital_account_c=>sc_node-root.
+          ls_modification-key         =     ls_da->key.
+
+          APPEND if_cuan_digital_account_c=>sc_node_attribute-root-status TO ls_modification-changed_fields.
+          IF is_root-status EQ if_cuan_digital_account=>gc_digacc_status_inactive. "Inactive, only status changed.
+
+          ELSE.
+            IF lt_da_ext IS INITIAL.
+              APPEND if_cuan_digital_account_c=>sc_node_attribute-root-digacc_desc         TO ls_modification-changed_fields.
+              APPEND if_cuan_digital_account_c=>sc_node_attribute-root-smtp_addr           TO ls_modification-changed_fields.
+              APPEND if_cuan_digital_account_c=>sc_node_attribute-root-avatar              TO ls_modification-changed_fields.
+              APPEND if_cuan_digital_account_c=>sc_node_attribute-root-auth_method         TO ls_modification-changed_fields.
+            ENDIF.
+*cusotme fields should be changable
+            CALL FUNCTION 'DDIF_TABL_GET'
+              EXPORTING
+                name          = 'INCL_EEW_CUAN_DA_ROOT'
+                state         = 'A'
+              TABLES
+                dd03p_tab     = lt_comp
+              EXCEPTIONS
+                illegal_input = 1
+                OTHERS        = 2.
+            IF sy-subrc <> 0.
+              RETURN.
+            ENDIF.
+
+            LOOP AT lt_comp ASSIGNING FIELD-SYMBOL(<ls_field>)
+            WHERE ( domname NE 'DUMMY' AND domname IS NOT INITIAL ).
+              APPEND <ls_field>-fieldname TO ls_modification-changed_fields.
+            ENDLOOP.
+          ENDIF.
+          APPEND ls_modification TO lt_modification.
+
+          mo_service_mgr->modify( EXPORTING it_modification = lt_modification
+                                  IMPORTING eo_change   = eo_change
+                                            eo_message  = eo_message ).
+        ENDIF.
+      CATCH cx_cuan_digital_account INTO DATA(lx_ex).
+        RAISE EXCEPTION lx_ex.
+    ENDTRY.
+
+  ENDMETHOD.
+ENDCLASS.

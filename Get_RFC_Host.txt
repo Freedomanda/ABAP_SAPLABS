@@ -1,0 +1,32 @@
+  METHOD get_rfc_host.
+    DATA: oerror TYPE REF TO CX_DEST_API.
+*    DATA:
+*           lv_rfcoptions TYPE rfcoptions,
+*           lv_host_segment TYPE string.
+*
+** --------------------------------------------------------
+** Sample rfcoptions:
+**     H={host_name},D={username},I=443,N={path_prefix},W=Y,B=N,C=N,E=N,T=N,K=Y,Q=B,s=Y,u=N,1=00,
+** --------------------------------------------------------
+*
+*    SELECT rfcoptions
+*    INTO lv_rfcoptions
+*    FROM rfcdes
+*    WHERE rfcdest = iv_rfc_destination.
+*    ENDSELECT.
+*
+*    SPLIT lv_rfcoptions AT ',' INTO TABLE DATA(lt_segments).
+*    READ TABLE lt_segments INDEX 1 INTO lv_host_segment.
+*    IF sy-subrc = 0.
+*      ev_host_name = lv_host_segment+2.
+*    ENDIF.
+
+    DATA lo_rfcdest TYPE REF TO cl_dest_http.
+
+    TRY.
+      lo_rfcdest ?= cl_dest_factory=>create( name = iv_rfc_destination ).
+      ev_host_name = lo_rfcdest->server_name.
+      CATCH CX_DEST_API  INTO oerror.
+    ENDTRY.
+
+  ENDMETHOD.

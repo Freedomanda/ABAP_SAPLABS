@@ -1,0 +1,49 @@
+
+Check If RFC Destination Uses Logon Procedure
+
+IV_RFC_DESTINATION	TYPE RFCDEST	RFC Destination
+EV_SLOGIN	TYPE ABAP_BOOL	ABAP_TRUE: Use Logon Procedure
+
+
+
+  METHOD check_rfc_slogin.
+    DATA: oerror TYPE REF TO cx_dest_api.
+
+*    DATA lv_rfcoptions TYPE rfcoptions.
+*
+** --------------------------------------------------------
+** Sample rfcoptions:
+**     H={host_name},D={username},I=443,N={path_prefix},W=Y,B=N,C=N,E=N,T=N,K=Y,Q=B,s=Y,u=N,1=00,
+** --------------------------------------------------------
+*
+*    SELECT rfcoptions
+*    INTO lv_rfcoptions
+*    FROM rfcdes
+*    WHERE rfcdest = iv_rfc_destination.
+*    ENDSELECT.
+*
+*    FIND 'Q=B,' IN lv_rfcoptions.
+*    IF sy-subrc = 0. " Is Basic Authentication
+*      ev_slogin = abap_true.
+*    ELSE.
+*      ev_slogin = abap_false.
+*    ENDIF.
+
+    DATA lo_rfcdest TYPE REF TO cl_dest_http.
+
+    TRY.
+    lo_rfcdest ?= cl_dest_factory=>create( name = iv_rfc_destination ).
+      CATCH cx_dest_api  INTO oerror.
+    ENDTRY.
+
+    IF lo_rfcdest IS NOT BOUND.
+      ev_slogin = abap_false.
+      RETURN.
+    ENDIF.
+
+    IF lo_rfcdest->logon_method = lo_rfcdest->co_logon_method_basic_auth. " Is Basic Authentication
+      ev_slogin = abap_true.
+    ELSE.
+      ev_slogin = abap_false.
+    ENDIF.
+  ENDMETHOD.

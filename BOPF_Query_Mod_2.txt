@@ -1,0 +1,2166 @@
+class CL_CUAN_WECHAT_SERVICES definition
+  public
+  create public .
+
+public section.
+
+  types TS_POST_DATA type IF_CUAN_WECHAT_API=>TS_POST_DATA .
+  types:
+    tt_post_data TYPE TABLE OF if_cuan_wechat_api=>ts_post_data .
+  types TY_DAKEY type /BOBF/CONF_KEY .
+  types:
+    BEGIN OF ty_userinfo,
+        subscribe(1)   TYPE c,
+        openid         TYPE cuan_wechat_openid,
+        nickname(30)   TYPE c,
+        sex(5)         TYPE c,
+        city(30)       TYPE c,
+        country(30)    TYPE c,
+        province(30)   TYPE c,
+        language(10)   TYPE c,
+        headimgurl     TYPE string,
+        subscribe_time TYPE timestampl,
+        unionid(50)    TYPE c,
+        remark(255)    TYPE c,
+        groupid(30)    TYPE c,
+        contact_key    TYPE /bobf/conf_key,
+      END OF ty_userinfo .
+  types:
+    tt_userinfo TYPE TABLE OF ty_userinfo .
+  types:
+    BEGIN OF ty_storeinfo,
+        sid             TYPE string,
+        business_name   TYPE string,
+        branch_name     TYPE string,
+        address         TYPE string,
+        telephone       TYPE string,
+        categories      TYPE string,
+        city            TYPE string,
+        province        TYPE string,
+        offset_type     TYPE string,
+        longitude       TYPE string,
+        latitude        TYPE string,
+        introduction    TYPE string,
+        recommend       TYPE string,
+        special         TYPE string,
+        open_time       TYPE string,
+        avg_price       TYPE string,
+        poi_id          TYPE string,
+        available_state TYPE string,
+        district        TYPE string,
+        update_status   TYPE string,
+      END OF ty_storeinfo .
+  types:
+    tt_storeinfo TYPE TABLE OF ty_storeinfo .
+  types:
+    BEGIN OF ty_shake_device,
+        comment          TYPE string,
+        device_id        TYPE string,
+        last_active_time TYPE timestampl,
+        major            TYPE string,
+        minor            TYPE string,
+        poi_id           TYPE string,
+        status           TYPE string,
+        uuid             TYPE string,
+      END OF ty_shake_device .
+  types:
+    tt_shake_device TYPE TABLE OF ty_shake_device .
+  types:
+    BEGIN OF ty_shake_page,
+        comment     TYPE string,
+        description TYPE string,
+        icon_url    TYPE string,
+        page_id     TYPE string,
+        page_url    TYPE string,
+        title       TYPE string,
+      END OF ty_shake_page .
+  types:
+    tt_shake_page TYPE TABLE OF ty_shake_page .
+
+  data MO_WECHAT_CONTENT type ref to /BOBF/IF_TRA_SERVICE_MANAGER .
+
+  methods TEST_CONNECTION
+    importing
+      value(IV_APPID) type STRING
+      value(IV_SECID) type STRING
+    exporting
+      !EV_TOKEN type STRING
+    exceptions
+      FETCH_TOKEN_ERROR
+      INVALID_APP_ID
+      INVALID_APP_SECRET .
+  methods GET_USER_DETAIL
+    importing
+      value(IV_DAKEY) type TY_DAKEY
+      !IV_OPENID type CUAN_WECHAT_OPENID
+    exporting
+      !ES_USERINFO type TY_USERINFO
+    exceptions
+      WECHAT_API_ERROR .
+  methods GET_USER_LIST
+    importing
+      value(IV_DAKEY) type TY_DAKEY
+      !IV_NEXTOPENID type CUAN_WECHAT_OPENID optional
+    exporting
+      !EV_TOTAL type STRING
+      !EV_COUNT type STRING
+      !EV_NEXTOPENID type CUAN_WECHAT_OPENID
+      !ET_USERINFO type TT_USERINFO
+    exceptions
+      WECHAT_API_ERROR .
+  methods SEND_DIRECT_MESSAGE_BATCH
+    importing
+      !IV_DAKEY type TY_DAKEY
+      !IS_CONTENT type CUAN_S_DA_CC
+    changing
+      !CT_POST_DATA type TT_POST_DATA
+    exceptions
+      WECHAT_API_ERROR .
+  methods SEND_DIRECT_MESSAGE
+    importing
+      !IV_DAKEY type TY_DAKEY
+      !IV_OPENID type CUAN_WECHAT_OPENID
+      !IV_CONTENTID type STRING
+    exporting
+      !ES_CONTENT type CUAN_S_DA_CC
+      !EV_ERROR_CODE type STRING
+      !EV_ERROR_MESSAGE type STRING
+    exceptions
+      WECHAT_API_ERROR .
+  methods SEND_BROADCAST_MESSAGE
+    importing
+      !IV_DAKEY type TY_DAKEY
+      !IT_POST_DATA type TT_POST_DATA
+      !IS_CONTENT type CUAN_S_DA_CC
+    exporting
+      !EV_MESSAGE_ID type SSTRING
+      !EV_MESSAGE_DATA_ID type SSTRING
+      !EV_ERROR_CODE type STRING
+      !EV_ERROR_MESSAGE type STRING
+    exceptions
+      WECHAT_API_ERROR .
+  methods SYNC_MEDIA_TO_YMKT
+    importing
+      value(IV_DAKEY) type TY_DAKEY
+      value(IV_TYPE) type STRING
+      value(IV_SYNC_ALL) type CHAR1 default 'X'
+    exporting
+      !ET_CONTENT type CUAN_T_DA_CC
+      !EV_COUNT type CUAN_WECHAT_SYNC_COUNT
+    exceptions
+      WECHAT_CONTENT_SYNC_FAILED
+      WECHAT_API_ERROR .
+  methods SYNC_COUPON_TO_YMKT
+    importing
+      value(IV_DAKEY) type TY_DAKEY
+      !IV_SYNC_ALL type CHAR1 default 'X'
+    exporting
+      !ET_CONTENT type CUAN_T_DA_CC
+      !EV_COUNT type CUAN_WECHAT_SYNC_COUNT
+    exceptions
+      WECHAT_CONTENT_SYNC_FAILED .
+  methods SYNC_SHAKE_PAGE_TO_YMKT
+    importing
+      !IV_DAKEY type TY_DAKEY
+    exporting
+      !ET_CONTENT type CUAN_T_DA_CC
+      !EV_COUNT type CUAN_WECHAT_SYNC_COUNT
+    exceptions
+      WECHAT_CONTENT_SYNC_FAILED .
+  methods SYNC_USER_TO_YMKT
+    importing
+      !IV_DAKEY type TY_DAKEY
+      !IV_COUNT type INT8 optional
+      !IV_IMAGE_FLAG type BOOLEAN optional
+      !IT_OPENID_LIST type TT_USERINFO optional
+      !IV_PERMISSION_FLAG type BOOLEAN optional
+      !IV_EXPUSERINF_FLAG type BOOLEAN optional
+      !IV_NEXTOPENID type CUAN_WECHAT_OPENID optional
+    exporting
+      !ET_USERINFO type TT_USERINFO
+      !EV_COUNT type CUAN_WECHAT_SYNC_COUNT
+      !EV_IMAGE_ERROR_COUNT type CUAN_WECHAT_SYNC_COUNT
+      !EV_IMAGE_EXIST_COUNT type CUAN_WECHAT_SYNC_COUNT
+    exceptions
+      WECHAT_API_ERROR .
+  methods GET_STORE_LIST
+    importing
+      !IV_DAKEY type TY_DAKEY
+    exporting
+      !ET_STOREINFO type TT_STOREINFO
+    exceptions
+      WECHAT_API_ERROR .
+  methods GET_USER_DETAIL_BATCH
+    importing
+      value(IV_DAKEY) type TY_DAKEY
+      !IT_USERINFO type TT_USERINFO
+    exporting
+      !ET_USERINFO type TT_USERINFO
+    exceptions
+      WECHAT_API_ERROR .
+  methods CONSTRUCTOR
+    importing
+      !IO_WECHAT_API type ref to IF_CUAN_WECHAT_API optional .
+  methods UPDATE_FOLLOW_STATUS
+    importing
+      !IV_DAKEY type TY_DAKEY
+      !IT_OPENID_LIST type TT_USERINFO .
+  methods FETCH_IMAGE_TO_CONTACT
+    importing
+      !IV_URL type STRING optional
+      !IV_CONTACTKEY type CUAN_S_CE_CONTACT_KEY_EXP_RFC-CONTACT_KEY optional
+    exceptions
+      INVALID_URL
+      FETCH_IMAGE_ERROR
+      ALREADY_EXISTED .
+  methods GET_SHAKE_DEVICE
+    importing
+      !IV_DAKEY type TY_DAKEY
+    exporting
+      !ET_SHAKE_DEVICE type TT_SHAKE_DEVICE
+    exceptions
+      WECHAT_API_ERROR .
+  methods GET_SHAKE_DEVICE_BY_ID
+    importing
+      !IV_DAKEY type TY_DAKEY
+      !IT_DEVICE_IDENTIFIERS type TT_SHAKE_DEVICE
+    exporting
+      !ET_SHAKE_DEVICE type TT_SHAKE_DEVICE
+    exceptions
+      WECHAT_API_ERROR .
+  PROTECTED SECTION.
+private section.
+
+  data MO_WECHAT_API type ref to IF_CUAN_WECHAT_API .
+ENDCLASS.
+
+
+
+CLASS CL_CUAN_WECHAT_SERVICES IMPLEMENTATION.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->CONSTRUCTOR
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IO_WECHAT_API                  TYPE REF TO IF_CUAN_WECHAT_API(optional)
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD constructor.
+    IF io_wechat_api IS NOT BOUND.
+      CREATE OBJECT mo_wechat_api TYPE cl_cuan_wechat_api.
+    ELSE.
+      mo_wechat_api = io_wechat_api.
+    ENDIF.
+
+    mo_wechat_content ?= /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_wechat_content_c=>sc_bo_key ).
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->FETCH_IMAGE_TO_CONTACT
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_URL                         TYPE        STRING(optional)
+* | [--->] IV_CONTACTKEY                  TYPE        CUAN_S_CE_CONTACT_KEY_EXP_RFC-CONTACT_KEY(optional)
+* | [EXC!] INVALID_URL
+* | [EXC!] FETCH_IMAGE_ERROR
+* | [EXC!] ALREADY_EXISTED
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD fetch_image_to_contact.
+
+    DATA:
+      lv_content        TYPE        string,
+      lv_xcontent       TYPE        xstring,
+      lv_object_id      TYPE hpa_generic_object_id,
+      ls_object_content TYPE /iwbep/cl_mgw_abs_data=>ty_s_media_resource.
+
+    DATA: lo_http_client TYPE REF TO if_http_client.
+
+    IF iv_url IS INITIAL.
+      RAISE invalid_url.
+    ENDIF.
+
+    lv_object_id = iv_contactkey.
+
+    CALL METHOD cl_hpa_bo_document_data_helper=>read_document_content
+      EXPORTING
+        iv_object_type = 'CUAN_INTERACTION_CONTACT'    " Generic Object Type - /BOBF/OBM_NAME
+        iv_object_id   = lv_object_id    " Generic Object ID
+      IMPORTING
+        es_content     = ls_object_content.    " Media Type Information
+
+    IF ls_object_content IS INITIAL.
+* ----------------------------------------------------------------
+* Create HTTP connection directly by request URL and request type
+* ----------------------------------------------------------------
+      CALL METHOD mo_wechat_api->create_http_connection
+        EXPORTING
+          iv_api_id                 = 'FETCH_IMAGE_TO_CONTACT'
+          iv_request_url            = iv_url
+          iv_request_type           = if_cuan_wechat_api=>gs_http_request_type-get
+        RECEIVING
+          eo_http_client            = lo_http_client
+        EXCEPTIONS
+          http_client_creation_failed = 1.
+
+      IF sy-subrc <> 0.
+        RAISE fetch_image_error.
+      ENDIF .
+
+* ----------------------------------------------------------------
+* Send HTTP request
+* ----------------------------------------------------------------
+      CALL METHOD mo_wechat_api->send_http_request
+        EXPORTING
+          io_http_client         = lo_http_client
+        IMPORTING
+          ev_response            = lv_content
+          ev_xresponse           = lv_xcontent
+        EXCEPTIONS
+          http_request_send_fail = 1.
+      IF sy-subrc <> 0.
+        RAISE fetch_image_error.
+      ENDIF .
+
+* ----------------------------------------------------------------
+* Set image to contact
+* ----------------------------------------------------------------
+      cl_cuan_image_helper=>set_image_data_for_object(
+          iv_object_type = 'CUAN_INTERACTION_CONTACT'
+          iv_object_id   = lv_object_id
+          iv_content     = lv_xcontent
+          iv_mime_type   = CONV #( 'image/png' )
+      ).
+    ELSE.
+      RAISE already_existed.
+    ENDIF.
+
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->GET_SHAKE_DEVICE
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        TY_DAKEY
+* | [<---] ET_SHAKE_DEVICE                TYPE        TT_SHAKE_DEVICE
+* | [EXC!] WECHAT_API_ERROR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_shake_device.
+    DATA:
+      lv_post_para    TYPE        string,
+      ls_node         TYPE        cl_cuan_wechat_utility=>ty_json_itable,
+      lt_node_tab     TYPE        cl_cuan_wechat_utility=>tt_json_itable,
+      ls_shake_device TYPE        ty_shake_device,
+      lt_shake_device TYPE        tt_shake_device,
+      lv_count        TYPE        cuan_wechat_sync_count,
+      lv_last_seen    TYPE        string VALUE '0'.
+
+    WHILE lv_count IS INITIAL OR lv_count > lines( lt_shake_device ).
+
+      CONCATENATE '{"type":' '2' ',"last_seen": ' lv_last_seen ',"count":50}' INTO lv_post_para.
+      CLEAR lt_node_tab.
+      CALL METHOD mo_wechat_api->call_wechat_api
+        EXPORTING
+          iv_dakey               = iv_dakey
+          iv_api_id              = if_cuan_wechat_api=>gs_wechat_api_id-get_shake_device
+          iv_post_parameter      = lv_post_para
+        IMPORTING
+          et_data                = lt_node_tab
+        EXCEPTIONS
+          wechat_api_call_failed = 1
+          OTHERS                 = 2.
+      IF sy-subrc <> 0.
+        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+          WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+          RAISING wechat_api_error.
+      ENDIF .
+      IF lt_node_tab IS INITIAL.
+        EXIT.
+      ENDIF.
+      CLEAR ls_shake_device.
+      LOOP AT lt_node_tab INTO ls_node.
+        CASE ls_node-attribute.
+          WHEN 'data-devices-comment'.ls_shake_device-comment = ls_node-value.
+          WHEN 'data-devices-device_id'.ls_shake_device-device_id = ls_node-value.lv_last_seen = ls_node-value.
+          WHEN 'data-devices-last_active_time'.
+            CALL METHOD cl_cuan_wechat_utility=>convert_unix_timestamp
+              EXPORTING
+                iv_secs       = ls_node-value
+              IMPORTING
+                ev_timestampl = ls_shake_device-last_active_time.
+          WHEN 'data-devices-major'.ls_shake_device-major = ls_node-value.
+          WHEN 'data-devices-minor'.ls_shake_device-minor = ls_node-value.
+          WHEN 'data-devices-poi_id'.ls_shake_device-poi_id = ls_node-value.
+          WHEN 'data-devices-status'.ls_shake_device-status = ls_node-value.
+          WHEN 'data-devices-uuid'.
+            ls_shake_device-uuid = ls_node-value.
+            APPEND ls_shake_device TO lt_shake_device.
+            APPEND ls_shake_device TO et_shake_device.
+            CLEAR ls_shake_device.
+          WHEN 'data-total_count'.
+            lv_count = ls_node-value.
+            IF lv_count IS INITIAL.
+              RETURN.
+            ENDIF.
+          WHEN OTHERS.
+        ENDCASE.
+      ENDLOOP.
+      IF lines( lt_shake_device ) IS INITIAL.
+        RETURN.
+      ENDIF.
+      CLEAR lt_shake_device.
+    ENDWHILE.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->GET_SHAKE_DEVICE_BY_ID
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        TY_DAKEY
+* | [--->] IT_DEVICE_IDENTIFIERS          TYPE        TT_SHAKE_DEVICE
+* | [<---] ET_SHAKE_DEVICE                TYPE        TT_SHAKE_DEVICE
+* | [EXC!] WECHAT_API_ERROR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_shake_device_by_id.
+    DATA:
+      lv_post_para    TYPE        string,
+      ls_node         TYPE        cl_cuan_wechat_utility=>ty_json_itable,
+      lt_node_tab     TYPE        cl_cuan_wechat_utility=>tt_json_itable,
+      ls_shake_device TYPE        ty_shake_device,
+      lt_shake_device TYPE        tt_shake_device,
+      lv_count        TYPE        cuan_wechat_sync_count,
+      lv_last_seen    TYPE        string VALUE '0'.
+
+    DATA: ls_device_identifiers TYPE ty_shake_device,
+          lt_device_identifiers TYPE tt_shake_device,
+          lv_device_identifiers TYPE string.
+
+    LOOP AT it_device_identifiers INTO ls_device_identifiers.
+      APPEND ls_device_identifiers TO lt_device_identifiers.
+      IF lines( lt_device_identifiers ) >= 1.
+        LOOP AT lt_device_identifiers INTO ls_device_identifiers.
+          IF lv_device_identifiers IS NOT INITIAL.
+            lv_device_identifiers = lv_device_identifiers + ','.
+          ENDIF.
+          IF ls_device_identifiers-device_id IS NOT INITIAL.
+            CONCATENATE lv_device_identifiers '{"device_id":' ls_device_identifiers-device_id '}' INTO lv_device_identifiers.
+          ELSE.
+            CONCATENATE lv_device_identifiers '{"uuid":"' ls_device_identifiers-uuid
+            '","major":' ls_device_identifiers-major ',"minor":' ls_device_identifiers-minor '}' INTO lv_device_identifiers.
+          ENDIF.
+        ENDLOOP.
+        CONCATENATE '{"type":' '1' ',"device_identifiers": [' lv_device_identifiers ']}' INTO lv_post_para.
+        CLEAR: lv_device_identifiers,lt_device_identifiers,lt_node_tab.
+        CALL METHOD mo_wechat_api->call_wechat_api
+          EXPORTING
+            iv_dakey               = iv_dakey
+            iv_api_id              = if_cuan_wechat_api=>gs_wechat_api_id-get_shake_device
+            iv_post_parameter      = lv_post_para
+          IMPORTING
+            et_data                = lt_node_tab
+          EXCEPTIONS
+            wechat_api_call_failed = 1
+            OTHERS                 = 2.
+        IF sy-subrc <> 0.
+          MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+            WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+            RAISING wechat_api_error.
+        ENDIF .
+
+        CLEAR ls_shake_device.
+        LOOP AT lt_node_tab INTO ls_node.
+          CASE ls_node-attribute.
+            WHEN 'data-devices-comment'.ls_shake_device-comment = ls_node-value.
+            WHEN 'data-devices-device_id'.ls_shake_device-device_id = ls_node-value.lv_last_seen = ls_node-value.
+            WHEN 'data-devices-last_active_time'.
+              CALL METHOD cl_cuan_wechat_utility=>convert_unix_timestamp
+                EXPORTING
+                  iv_secs       = ls_node-value
+                IMPORTING
+                  ev_timestampl = ls_shake_device-last_active_time.
+            WHEN 'data-devices-major'.ls_shake_device-major = ls_node-value.
+            WHEN 'data-devices-minor'.ls_shake_device-minor = ls_node-value.
+            WHEN 'data-devices-poi_id'.ls_shake_device-poi_id = ls_node-value.
+            WHEN 'data-devices-status'.ls_shake_device-status = ls_node-value.
+            WHEN 'data-devices-uuid'.
+              ls_shake_device-uuid = ls_node-value.
+              APPEND ls_shake_device TO lt_shake_device.
+              APPEND ls_shake_device TO et_shake_device.
+              CLEAR ls_shake_device.
+            WHEN OTHERS.
+          ENDCASE.
+        ENDLOOP.
+        CLEAR lt_shake_device.
+      ENDIF.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->GET_STORE_LIST
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        TY_DAKEY
+* | [<---] ET_STOREINFO                   TYPE        TT_STOREINFO
+* | [EXC!] WECHAT_API_ERROR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_store_list.
+    DATA:
+      lv_post_para  TYPE        string,
+      ls_node       TYPE        cl_cuan_wechat_utility=>ty_json_itable,
+      lt_node_tab   TYPE        cl_cuan_wechat_utility=>tt_json_itable,
+      ls_storeinfo  TYPE        ty_storeinfo,
+      lt_storeinfo  TYPE        tt_storeinfo,
+      lv_count      TYPE        cuan_wechat_sync_count,
+      lv_begin      TYPE        string VALUE '0',
+      lv_error_code TYPE       string.
+
+    WHILE lv_count IS INITIAL OR lv_count > lines( et_storeinfo ).
+      lv_begin = lines( et_storeinfo ).
+      CONCATENATE '{"offset":' lv_begin ',"limit":50}' INTO lv_post_para.
+      CLEAR lt_node_tab.
+      CALL METHOD mo_wechat_api->call_wechat_api
+        EXPORTING
+          iv_dakey               = iv_dakey
+          iv_api_id              = if_cuan_wechat_api=>gs_wechat_api_id-get_store_list
+          iv_post_parameter      = lv_post_para
+        IMPORTING
+          et_data                = lt_node_tab
+        EXCEPTIONS
+          wechat_api_call_failed = 1
+          OTHERS                 = 2.
+      IF sy-subrc <> 0.
+        LOOP AT lt_node_tab INTO ls_node.
+          CASE ls_node-attribute.
+            WHEN 'errcode'.
+              lv_error_code = ls_node-value.
+          ENDCASE.
+        ENDLOOP.
+        IF lv_error_code = '48001' or lv_error_code = '40097'.
+          CLEAR :lv_post_para,lt_node_tab.
+          CONCATENATE '{"begin":' lv_begin ',"limit":50}' INTO lv_post_para.
+          CLEAR lt_node_tab.
+          CALL METHOD mo_wechat_api->call_wechat_api
+            EXPORTING
+              iv_dakey               = iv_dakey
+              iv_api_id              = if_cuan_wechat_api=>gs_wechat_api_id-get_store_list_old
+              iv_post_parameter      = lv_post_para
+            IMPORTING
+              et_data                = lt_node_tab
+            EXCEPTIONS
+              wechat_api_call_failed = 1
+              OTHERS                 = 2.
+          IF sy-subrc <> 0.
+            MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+              WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+              RAISING wechat_api_error.
+          ENDIF .
+        ELSE.
+          MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+            WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+            RAISING wechat_api_error.
+        ENDIF.
+      ENDIF .
+      IF lt_node_tab IS INITIAL.
+        EXIT.
+      ENDIF.
+      CLEAR ls_storeinfo.
+      LOOP AT lt_node_tab INTO ls_node.
+        CASE ls_node-attribute.
+          WHEN 'business_list-base_info-sid'.ls_storeinfo-sid = ls_node-value.
+          WHEN 'business_list-base_info-business_name'.ls_storeinfo-business_name = ls_node-value.
+          WHEN 'business_list-base_info-branch_name'.ls_storeinfo-branch_name = ls_node-value.
+          WHEN 'business_list-base_info-address'.ls_storeinfo-address = ls_node-value.
+          WHEN 'business_list-base_info-telephone'.ls_storeinfo-telephone = ls_node-value.
+          WHEN 'business_list-base_info-categories'.ls_storeinfo-categories = ls_node-value.
+          WHEN 'business_list-base_info-city'.ls_storeinfo-city = ls_node-value.
+          WHEN 'business_list-base_info-province'.ls_storeinfo-province = ls_node-value.
+          WHEN 'business_list-base_info-offset_type'.ls_storeinfo-offset_type = ls_node-value.
+          WHEN 'business_list-base_info-longitude'.ls_storeinfo-longitude = ls_node-value.
+          WHEN 'business_list-base_info-latitude'.ls_storeinfo-latitude = ls_node-value.
+          WHEN 'business_list-base_info-introduction'.ls_storeinfo-introduction = ls_node-value.
+          WHEN 'business_list-base_info-recommend'.ls_storeinfo-recommend = ls_node-value.
+          WHEN 'business_list-base_info-special'.ls_storeinfo-special = ls_node-value.
+          WHEN 'business_list-base_info-open_time'.ls_storeinfo-open_time = ls_node-value.
+          WHEN 'business_list-base_info-avg_price'.ls_storeinfo-avg_price = ls_node-value.
+          WHEN 'business_list-base_info-poi_id'.ls_storeinfo-poi_id = ls_node-value.
+          WHEN 'business_list-base_info-available_state'.ls_storeinfo-available_state = ls_node-value.
+          WHEN 'business_list-base_info-update_status'.ls_storeinfo-update_status = ls_node-value.
+          WHEN 'business_list-base_info-district'.
+            ls_storeinfo-district = ls_node-value.
+            APPEND ls_storeinfo TO lt_storeinfo.
+            APPEND ls_storeinfo TO et_storeinfo.
+            CLEAR ls_storeinfo.
+          WHEN 'total_count'.
+            lv_count = ls_node-value.
+          WHEN OTHERS.
+        ENDCASE.
+      ENDLOOP.
+      IF lines( lt_storeinfo ) IS INITIAL.
+        RETURN.
+      ENDIF.
+      CLEAR lt_storeinfo.
+    ENDWHILE.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->GET_USER_DETAIL
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        TY_DAKEY
+* | [--->] IV_OPENID                      TYPE        CUAN_WECHAT_OPENID
+* | [<---] ES_USERINFO                    TYPE        TY_USERINFO
+* | [EXC!] WECHAT_API_ERROR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_user_detail.
+    DATA:
+      lv_get_para TYPE        string,
+      ls_node     TYPE        cl_cuan_wechat_utility=>ty_json_itable,
+      lt_node_tab TYPE        cl_cuan_wechat_utility=>tt_json_itable.
+
+    CONCATENATE 'openid=' iv_openid INTO lv_get_para.
+    CALL METHOD mo_wechat_api->call_wechat_api
+      EXPORTING
+        iv_dakey                    = iv_dakey
+        iv_api_id                   = if_cuan_wechat_api=>gs_wechat_api_id-get_user_detail
+        iv_additional_get_parameter = lv_get_para
+      IMPORTING
+        et_data                     = lt_node_tab
+      EXCEPTIONS
+        wechat_api_call_failed      = 1
+        OTHERS                      = 2.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+        RAISING wechat_api_error.
+    ELSE.
+      LOOP AT lt_node_tab INTO ls_node.
+        CASE ls_node-attribute.
+          WHEN 'subscribe'.
+            es_userinfo-subscribe = ls_node-value.
+          WHEN 'openid'.
+            es_userinfo-openid = ls_node-value.
+          WHEN 'nickname'.
+            es_userinfo-nickname = ls_node-value.
+          WHEN 'sex'.
+            es_userinfo-sex = ls_node-value.
+          WHEN 'city'.
+            es_userinfo-city = ls_node-value.
+          WHEN 'country'.
+            es_userinfo-country = ls_node-value.
+          WHEN 'province'.
+            es_userinfo-province = ls_node-value.
+          WHEN 'language'.
+            es_userinfo-language = ls_node-value.
+          WHEN 'headimgurl'.
+            es_userinfo-headimgurl = ls_node-value.
+          WHEN 'subscribe_time'.
+            CALL METHOD cl_cuan_wechat_utility=>convert_unix_timestamp
+              EXPORTING
+                iv_secs       = ls_node-value
+              IMPORTING
+                ev_timestampl = es_userinfo-subscribe_time.
+          WHEN 'unionid'.
+            es_userinfo-unionid = ls_node-value.
+          WHEN 'remark'.
+            es_userinfo-remark = ls_node-value.
+          WHEN 'groupid'.
+            es_userinfo-groupid = ls_node-value.
+        ENDCASE.
+      ENDLOOP.
+    ENDIF .
+
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->GET_USER_DETAIL_BATCH
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        TY_DAKEY
+* | [--->] IT_USERINFO                    TYPE        TT_USERINFO
+* | [<---] ET_USERINFO                    TYPE        TT_USERINFO
+* | [EXC!] WECHAT_API_ERROR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_user_detail_batch.
+    DATA:
+      lv_content  TYPE        string,
+      lv_lang     TYPE        string,
+      ls_node     TYPE        cl_cuan_wechat_utility=>ty_json_itable,
+      lt_node_tab TYPE        cl_cuan_wechat_utility=>tt_json_itable,
+      ls_userinfo TYPE        ty_userinfo.
+
+    IF sy-langu = 'E'.
+      CONCATENATE ',"lang":' '"en"' INTO lv_lang.
+    ELSE.
+      lv_lang = ''.
+    ENDIF.
+
+    CONCATENATE  '{"' 'user_list' '": [' INTO lv_content.
+
+    CLEAR ls_userinfo.
+    LOOP AT it_userinfo INTO ls_userinfo.
+      CONCATENATE lv_content '{"openid":' '"' ls_userinfo-openid '"' lv_lang '}' INTO lv_content.
+      IF sy-tabix = 100.
+        CLEAR ls_userinfo.
+        EXIT.
+      ENDIF.
+      CONCATENATE lv_content ',' INTO lv_content.
+      CLEAR ls_userinfo.
+    ENDLOOP.
+
+    CONCATENATE lv_content ']}' INTO lv_content.
+
+
+    CALL METHOD mo_wechat_api->call_wechat_api
+      EXPORTING
+        iv_dakey               = iv_dakey
+        iv_api_id              = if_cuan_wechat_api=>gs_wechat_api_id-get_user_detail_batch
+        iv_post_parameter      = lv_content
+      IMPORTING
+        et_data                = lt_node_tab
+      EXCEPTIONS
+        wechat_api_call_failed = 1
+        OTHERS                 = 2.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+        RAISING wechat_api_error.
+    ENDIF .
+
+    CLEAR ls_userinfo.
+    LOOP AT lt_node_tab INTO ls_node.
+      CASE ls_node-attribute.
+        WHEN 'user_info_list-subscribe'.ls_userinfo-subscribe = ls_node-value.
+        WHEN 'user_info_list-openid'.ls_userinfo-openid = ls_node-value.
+        WHEN 'user_info_list-nickname'.ls_userinfo-nickname = ls_node-value.
+        WHEN 'user_info_list-sex'.ls_userinfo-sex = ls_node-value.
+        WHEN 'user_info_list-city'.ls_userinfo-city = ls_node-value.
+        WHEN 'user_info_list-country'.ls_userinfo-country = ls_node-value.
+        WHEN 'user_info_list-province'.ls_userinfo-province = ls_node-value.
+        WHEN 'user_info_list-language'.ls_userinfo-language = ls_node-value.
+        WHEN 'user_info_list-headimgurl'.ls_userinfo-headimgurl = ls_node-value.
+        WHEN 'user_info_list-subscribe_time'.
+          CALL METHOD cl_cuan_wechat_utility=>convert_unix_timestamp
+            EXPORTING
+              iv_secs       = ls_node-value
+            IMPORTING
+              ev_timestampl = ls_userinfo-subscribe_time.
+        WHEN 'user_info_list-unionid'.ls_userinfo-unionid = ls_node-value.
+        WHEN 'user_info_list-remark'.ls_userinfo-remark = ls_node-value.
+        WHEN 'user_info_list-groupid'.ls_userinfo-groupid = ls_node-value.
+        WHEN OTHERS.
+      ENDCASE.
+      AT END OF index.
+        APPEND ls_userinfo TO et_userinfo.
+        CLEAR ls_userinfo.
+      ENDAT.
+    ENDLOOP.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->GET_USER_LIST
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        TY_DAKEY
+* | [--->] IV_NEXTOPENID                  TYPE        CUAN_WECHAT_OPENID(optional)
+* | [<---] EV_TOTAL                       TYPE        STRING
+* | [<---] EV_COUNT                       TYPE        STRING
+* | [<---] EV_NEXTOPENID                  TYPE        CUAN_WECHAT_OPENID
+* | [<---] ET_USERINFO                    TYPE        TT_USERINFO
+* | [EXC!] WECHAT_API_ERROR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_user_list.
+    DATA:
+      lv_get_para TYPE        string,
+      ls_node     TYPE        cl_cuan_wechat_utility=>ty_json_itable,
+      lt_node_tab TYPE        cl_cuan_wechat_utility=>tt_json_itable,
+      ls_userinfo TYPE        ty_userinfo,
+      lt_userinfo TYPE        tt_userinfo.
+
+      DATA lv_message TYPE string.
+
+    CONCATENATE 'next_openid=' iv_nextopenid  INTO lv_get_para.
+
+    CALL METHOD mo_wechat_api->call_wechat_api
+      EXPORTING
+        iv_dakey                    = iv_dakey
+        iv_api_id                   = if_cuan_wechat_api=>gs_wechat_api_id-get_user_list
+        iv_additional_get_parameter = lv_get_para
+      IMPORTING
+        et_data                     = lt_node_tab
+      EXCEPTIONS
+        wechat_api_call_failed      = 1
+        OTHERS                      = 2.
+
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING wechat_api_error.
+    ENDIF .
+
+    LOOP AT lt_node_tab INTO ls_node.
+      IF ls_node-attribute = 'total'.
+        ev_total = ls_node-value.
+      ENDIF.
+      IF ls_node-attribute = 'count'.
+        ev_count = ls_node-value.
+      ENDIF.
+      IF ls_node-attribute = 'next_openid'.
+        ev_nextopenid = ls_node-value.
+      ENDIF.
+      IF ls_node-attribute = 'data-openid'.
+        ls_userinfo-openid = ls_node-value.
+        APPEND ls_userinfo TO lt_userinfo.
+      ENDIF.
+    ENDLOOP.
+
+    et_userinfo = lt_userinfo.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->SEND_BROADCAST_MESSAGE
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        TY_DAKEY
+* | [--->] IT_POST_DATA                   TYPE        TT_POST_DATA
+* | [--->] IS_CONTENT                     TYPE        CUAN_S_DA_CC
+* | [<---] EV_MESSAGE_ID                  TYPE        SSTRING
+* | [<---] EV_MESSAGE_DATA_ID             TYPE        SSTRING
+* | [<---] EV_ERROR_CODE                  TYPE        STRING
+* | [<---] EV_ERROR_MESSAGE               TYPE        STRING
+* | [EXC!] WECHAT_API_ERROR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD send_broadcast_message.
+    DATA:
+      lv_post_para       TYPE string,
+      ls_post_data       TYPE ts_post_data,
+      lv_openid_string   TYPE string,
+      ls_node            TYPE cl_cuan_wechat_utility=>ty_json_itable,
+      lt_node_tab        TYPE cl_cuan_wechat_utility=>tt_json_itable,
+      ls_node_error_code TYPE cl_cuan_wechat_utility=>ty_json_itable,
+      ls_node_error_msg  TYPE cl_cuan_wechat_utility=>ty_json_itable.
+
+
+    LOOP AT it_post_data INTO ls_post_data.
+      CONCATENATE lv_openid_string '"' ls_post_data-openid '"' INTO lv_openid_string.
+      AT LAST.
+        CONTINUE.
+      ENDAT.
+      CONCATENATE lv_openid_string ',' INTO lv_openid_string.
+    ENDLOOP.
+    IF is_content-content_type = 'news'.
+      CONCATENATE '{"touser":[' lv_openid_string '],"msgtype":"mpnews","mpnews":{"media_id":"' is_content-content_id '"}}' INTO lv_post_para.
+    ELSEIF is_content-content_type = 'groupon'
+      OR is_content-content_type = 'cash'
+      OR is_content-content_type = 'discount'
+      OR is_content-content_type = 'gift'
+      OR is_content-content_type = 'general_coupon'.
+      CONCATENATE '{"touser":[' lv_openid_string '],"msgtype":"wxcard","wxcard":{"card_id":"' is_content-content_id '"}}' INTO lv_post_para.
+    ELSEIF is_content-content_type = 'image'.
+      CONCATENATE '{"touser":[' lv_openid_string '],"msgtype":"image","image":{"media_id":"' is_content-content_id '"}}' INTO lv_post_para.
+    ELSEIF is_content-content_type = 'localtext'.
+      CONCATENATE '{"touser":[' lv_openid_string '],"msgtype":"text","text":{"content":"' is_content-content '"}}' INTO lv_post_para.
+    ENDIF.
+
+    CALL METHOD mo_wechat_api->call_wechat_api
+      EXPORTING
+        iv_dakey               = iv_dakey
+        iv_api_id              = if_cuan_wechat_api=>gs_wechat_api_id-send_broadcast_message
+        iv_post_parameter      = lv_post_para
+      IMPORTING
+        et_data                = lt_node_tab
+      EXCEPTIONS
+        wechat_api_call_failed = 1
+        OTHERS                 = 2.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+        RAISING wechat_api_error.
+    ENDIF .
+
+    READ TABLE lt_node_tab INTO ls_node WITH KEY attribute = 'msg_id'.
+    IF sy-subrc = 0.
+      ev_message_id = ls_node-value.
+    ENDIF.
+    READ TABLE lt_node_tab INTO ls_node WITH KEY attribute = 'msg_data_id'.
+    IF sy-subrc = 0.
+      ev_message_data_id = ls_node-value.
+    ENDIF.
+
+    CLEAR ls_node_error_code.
+    CLEAR ls_node_error_msg.
+    READ TABLE lt_node_tab INTO ls_node_error_code WITH KEY attribute = 'errcode'.
+    IF sy-subrc = 0.
+      ev_error_code = ls_node_error_code-value.
+      READ TABLE lt_node_tab INTO ls_node_error_msg WITH KEY attribute = 'errmsg'.
+      IF sy-subrc = 0.
+        ev_error_message = ls_node_error_msg-value.
+      ENDIF.
+    ENDIF.
+
+    IF ls_node_error_code-value <> 0.
+      MESSAGE e000(cuan_wechat) WITH ls_node_error_code-value ls_node_error_msg-value INTO ev_error_message.
+      RAISE wechat_api_error.
+    ENDIF.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->SEND_DIRECT_MESSAGE
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        TY_DAKEY
+* | [--->] IV_OPENID                      TYPE        CUAN_WECHAT_OPENID
+* | [--->] IV_CONTENTID                   TYPE        STRING
+* | [<---] ES_CONTENT                     TYPE        CUAN_S_DA_CC
+* | [<---] EV_ERROR_CODE                  TYPE        STRING
+* | [<---] EV_ERROR_MESSAGE               TYPE        STRING
+* | [EXC!] WECHAT_API_ERROR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD send_direct_message.
+
+    DATA:
+      lv_post_para    TYPE        string,
+      lv_content_type TYPE        string,
+      ls_node         TYPE        cl_cuan_wechat_utility=>ty_json_itable,
+      lt_node_tab     TYPE        cl_cuan_wechat_utility=>tt_json_itable,
+      ls_content      TYPE cuan_s_da_cc,
+      lt_content      TYPE cuan_t_da_cc.
+
+    DATA lo_wechat_content TYPE REF TO cl_cuan_wechat_content_helper.
+    CREATE OBJECT lo_wechat_content
+      EXPORTING
+        io_srv_mgr = mo_wechat_content.
+
+    CALL METHOD lo_wechat_content->get_content
+      EXPORTING
+        iv_dakey      = iv_dakey
+        iv_content_id = iv_contentid
+      IMPORTING
+        et_content    = lt_content.
+    READ TABLE lt_content INTO ls_content WITH KEY index_id = '1'.
+    IF sy-subrc = 0.
+      lv_content_type = ls_content-content_type.
+      es_content = ls_content.
+    ENDIF.
+
+    IF lv_content_type = 'news'.
+      CONCATENATE '{"touser":"' iv_openid '","msgtype":"mpnews","mpnews":{"media_id":"' iv_contentid '"}}' INTO lv_post_para.
+    ELSEIF lv_content_type = 'groupon'
+      OR lv_content_type = 'cash'
+      OR lv_content_type = 'discount'
+      OR lv_content_type = 'gift'
+      OR lv_content_type = 'general_coupon'.
+      CONCATENATE '{"touser":"' iv_openid '","msgtype":"wxcard","wxcard":{"card_id":"' iv_contentid '"}}' INTO lv_post_para.
+    ELSEIF lv_content_type = 'image'.
+      CONCATENATE '{"touser":"' iv_openid '","msgtype":"image","image":{"media_id":"' iv_contentid '"}}' INTO lv_post_para.
+    ELSEIF lv_content_type = 'localtext'.
+      CONCATENATE '{"touser":"' iv_openid '","msgtype":"text","text":{"content":"' ls_content-content '"}}' INTO lv_post_para.
+    ENDIF.
+
+    CALL METHOD mo_wechat_api->call_wechat_api
+      EXPORTING
+        iv_dakey               = iv_dakey
+        iv_api_id              = if_cuan_wechat_api=>gs_wechat_api_id-send_direct_message
+        iv_post_parameter      = lv_post_para
+      IMPORTING
+        et_data                = lt_node_tab
+      EXCEPTIONS
+        wechat_api_call_failed = 1
+        OTHERS                 = 2.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+        RAISING wechat_api_error.
+    ENDIF .
+
+    READ TABLE lt_node_tab INTO ls_node WITH KEY attribute = 'errcode'.
+    IF sy-subrc = 0.
+      ev_error_code = ls_node-value.
+      READ TABLE lt_node_tab INTO ls_node WITH KEY attribute = 'errmsg'.
+      IF sy-subrc = 0.
+        ev_error_message = ls_node-value.
+      ENDIF.
+    ENDIF.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->SEND_DIRECT_MESSAGE_BATCH
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        TY_DAKEY
+* | [--->] IS_CONTENT                     TYPE        CUAN_S_DA_CC
+* | [<-->] CT_POST_DATA                   TYPE        TT_POST_DATA
+* | [EXC!] WECHAT_API_ERROR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD send_direct_message_batch.
+
+    DATA:
+      ls_node      TYPE        cl_cuan_wechat_utility=>ty_json_itable,
+      lt_node_tab  TYPE        cl_cuan_wechat_utility=>tt_json_itable,
+      lv_post_para TYPE        string,
+      ls_post_data TYPE ts_post_data.
+    DATA lr_error TYPE REF TO cx_root.
+
+    LOOP AT ct_post_data INTO ls_post_data.
+      IF is_content-content_type = 'news'.
+        CONCATENATE '{"touser":"' ls_post_data-openid '","msgtype":"mpnews","mpnews":{"media_id":"' is_content-content_id '"}}' INTO ls_post_data-post_parameter.
+      ELSEIF is_content-content_type = 'groupon'
+        OR is_content-content_type = 'cash'
+        OR is_content-content_type = 'discount'
+        OR is_content-content_type = 'gift'
+        OR is_content-content_type = 'general_coupon'.
+        CONCATENATE '{"touser":"' ls_post_data-openid '","msgtype":"wxcard","wxcard":{"card_id":"' is_content-content_id '"}}' INTO ls_post_data-post_parameter.
+      ELSEIF is_content-content_type = 'image'.
+        CONCATENATE '{"touser":"' ls_post_data-openid '","msgtype":"image","image":{"media_id":"' is_content-content_id '"}}' INTO ls_post_data-post_parameter.
+      ELSEIF is_content-content_type = 'localtext'.
+        CONCATENATE '{"touser":"' ls_post_data-openid '","msgtype":"text","text":{"content":"' is_content-content '"}}' INTO ls_post_data-post_parameter.
+      ENDIF.
+      MODIFY ct_post_data FROM ls_post_data.
+    ENDLOOP.
+
+    CALL METHOD mo_wechat_api->call_wechat_api
+      EXPORTING
+        iv_dakey               = iv_dakey
+        iv_api_id              = if_cuan_wechat_api=>gs_wechat_api_id-send_direct_message
+        iv_post_parameter      = lv_post_para
+      IMPORTING
+        et_data                = lt_node_tab
+      CHANGING
+        ct_post_data           = ct_post_data
+      EXCEPTIONS
+        wechat_api_call_failed = 1
+        OTHERS                 = 2.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+         WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING wechat_api_error.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->SYNC_COUPON_TO_YMKT
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        TY_DAKEY
+* | [--->] IV_SYNC_ALL                    TYPE        CHAR1 (default ='X')
+* | [<---] ET_CONTENT                     TYPE        CUAN_T_DA_CC
+* | [<---] EV_COUNT                       TYPE        CUAN_WECHAT_SYNC_COUNT
+* | [EXC!] WECHAT_CONTENT_SYNC_FAILED
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD sync_coupon_to_ymkt.
+    DATA:
+      lv_token            TYPE        string,
+      lv_post_para        TYPE        string,
+      lv_count            TYPE        string,
+      lv_currentcount(10) TYPE        n VALUE 0,
+      lv_totalcount(10)   TYPE        n VALUE 0,
+      ls_content          TYPE        cuan_s_da_cc,
+      lt_content          TYPE        cuan_t_da_cc,
+      lt_db_content_temp  TYPE        cuan_t_da_cc,
+      lt_content_temp     TYPE        cuan_t_da_cc,
+      ls_node             TYPE        cl_cuan_wechat_utility=>ty_json_itable,
+      lt_node_tab         TYPE        cl_cuan_wechat_utility=>tt_json_itable,
+      lv_replace_string   TYPE        string,
+      lt_db_content       TYPE        cuan_t_da_cc.
+
+    FIELD-SYMBOLS <ls_content>  TYPE        cuan_s_da_cc.
+
+    DATA lo_wechat_content TYPE REF TO cl_cuan_wechat_content_helper.
+    CREATE OBJECT lo_wechat_content
+      EXPORTING
+        io_srv_mgr = mo_wechat_content.
+*set content obsolete according to type and da key
+*    CLEAR lt_content.
+*    CALL METHOD lo_wechat_content->get_content
+*      EXPORTING
+*        iv_dakey      = iv_dakey
+*        iv_cache_type = 'coupon'
+*      IMPORTING
+*        et_content    = lt_content.
+*    LOOP AT lt_content INTO ls_content.
+*      ls_content-del_flag = abap_true.
+*      MODIFY lt_content FROM ls_content TRANSPORTING del_flag.
+*    ENDLOOP.
+*    CALL METHOD lo_wechat_content->update_content
+*      EXPORTING
+*        iv_dakey   = iv_dakey  " Digital Account DB_KEY
+*        it_content = lt_content.  " Content Cache Table Type
+*    CLEAR:lt_content,ls_content.
+
+    WHILE lv_currentcount < lv_totalcount OR lv_totalcount IS INITIAL.
+      CLEAR :lt_content_temp.
+      CONCATENATE '{"offset":"' lv_currentcount '","count":"50"}' INTO lv_post_para.
+      CALL METHOD mo_wechat_api->call_wechat_api
+        EXPORTING
+          iv_dakey               = iv_dakey
+          iv_api_id              = if_cuan_wechat_api=>gs_wechat_api_id-sync_coupon_to_ymkt_list
+          iv_post_parameter      = lv_post_para
+        IMPORTING
+          et_data                = lt_node_tab
+        EXCEPTIONS
+          wechat_api_call_failed = 1
+          OTHERS                 = 2.
+      IF sy-subrc <> 0.
+        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+        RAISING wechat_content_sync_failed.
+      ENDIF.
+      IF lt_node_tab IS INITIAL.
+        EXIT.
+      ENDIF.
+      LOOP AT lt_node_tab INTO ls_node.
+        CASE ls_node-attribute.
+          WHEN 'card_id_list'.
+            ls_content-content_id = ls_node-value.
+            APPEND ls_content TO lt_content_temp.
+          WHEN 'total_num'.
+            lv_totalcount = ls_node-value.
+          WHEN OTHERS.
+        ENDCASE.
+      ENDLOOP.
+
+      IF lv_totalcount = 0.
+        RETURN.
+      ELSE.
+        lv_currentcount = lv_currentcount + lv_totalcount.
+      ENDIF.
+
+      CLEAR lt_db_content_temp.
+      CALL METHOD lo_wechat_content->get_content
+        EXPORTING
+          iv_dakey   = iv_dakey    " Digital Account DB_KEY
+          it_content = lt_content_temp    " Content Cache List
+        IMPORTING
+          et_content = lt_db_content_temp.    " Content Cache Table Type
+      LOOP AT lt_content_temp INTO ls_content.
+        APPEND ls_content TO lt_content.
+      ENDLOOP.
+
+      IF lt_db_content_temp IS NOT INITIAL AND iv_sync_all <> 'X'.
+        EXIT.
+      ENDIF.
+
+    ENDWHILE.
+
+
+    LOOP AT lt_content ASSIGNING <ls_content>.
+
+      CONCATENATE '{"card_id":"' <ls_content>-content_id '"}' INTO lv_post_para.
+      CLEAR: lt_node_tab,ls_node.
+      CALL METHOD mo_wechat_api->call_wechat_api
+        EXPORTING
+          iv_dakey               = iv_dakey
+          iv_api_id              = 'SYNC_COUPON_TO_YMKT'
+          iv_post_parameter      = lv_post_para
+        IMPORTING
+          et_data                = lt_node_tab
+        EXCEPTIONS
+          wechat_api_call_failed = 1
+          OTHERS                 = 2.
+      IF sy-subrc <> 0.
+        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+        RAISING wechat_content_sync_failed.
+      ENDIF.
+
+      LOOP AT lt_node_tab INTO ls_node.
+
+        IF <ls_content>-content_type IS NOT INITIAL.
+          CONCATENATE '-' <ls_content>-content_type '-' INTO lv_replace_string.
+          REPLACE lv_replace_string WITH '-' INTO  ls_node-attribute.
+        ENDIF.
+
+        CASE ls_node-attribute.
+          WHEN 'card-card_type'.
+            <ls_content>-content_type = ls_node-value.
+            <ls_content>-index_id = '1'.
+            <ls_content>-parent_key = iv_dakey.
+            <ls_content>-dakey = iv_dakey.
+            <ls_content>-cache_type = 'coupon'.
+            TRANSLATE <ls_content>-content_type TO LOWER CASE.
+          WHEN 'card-base_info-brand_name'.
+            <ls_content>-coupon_brand_name = ls_node-value.
+          WHEN 'card-base_info-title'.
+            <ls_content>-title = ls_node-value.
+          WHEN 'card-base_info-date_info-type'.
+            <ls_content>-coupon_validity_type = ls_node-value.
+          WHEN 'card-base_info-logo_url'.
+            <ls_content>-thumb_image_url = ls_node-value.
+          WHEN 'card-base_info-date_info-begin_timestamp'.
+            CALL METHOD cl_cuan_wechat_utility=>convert_unix_timestamp
+              EXPORTING
+                iv_secs       = ls_node-value
+              IMPORTING
+                ev_timestampl = <ls_content>-coupon_begin_date_time.
+          WHEN 'card-base_info-date_info-end_timestamp'.
+            CALL METHOD cl_cuan_wechat_utility=>convert_unix_timestamp
+              EXPORTING
+                iv_secs       = ls_node-value
+              IMPORTING
+                ev_timestampl = <ls_content>-coupon_end_date_time.
+          WHEN 'card-base_info-update_time'.
+            CALL METHOD cl_cuan_wechat_utility=>convert_unix_timestamp
+              EXPORTING
+                iv_secs       = ls_node-value
+              IMPORTING
+                ev_timestampl = <ls_content>-update_date_time.
+          WHEN 'card-base_info-date_info-fixed_term'.
+            <ls_content>-coupon_fixed_term = ls_node-value.
+          WHEN 'card-base_info-date_info-fixed_begin_term'.
+            <ls_content>-coupon_fixed_begin_term = ls_node-value.
+          WHEN 'card-base_info-sku-quantity'.
+            <ls_content>-coupon_stock = ls_node-value.
+          WHEN 'card-base_info-sku-total_quantity'.
+            <ls_content>-coupon_total_quantity = ls_node-value.
+          WHEN 'card-base_info-status'.
+            <ls_content>-coupon_status = ls_node-value.
+          WHEN OTHERS.
+        ENDCASE.
+        IF <ls_content>-coupon_status = 'CARD_STATUS_DELETE'.
+          <ls_content>-del_flag = abap_true.
+        ENDIF.
+      ENDLOOP.
+    ENDLOOP.
+
+    CALL METHOD lo_wechat_content->update_content
+      EXPORTING
+        iv_dakey   = iv_dakey
+        it_content = lt_content.
+
+    et_content = lt_content.
+    ev_count = lines( lt_content ).
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->SYNC_MEDIA_TO_YMKT
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        TY_DAKEY
+* | [--->] IV_TYPE                        TYPE        STRING
+* | [--->] IV_SYNC_ALL                    TYPE        CHAR1 (default ='X')
+* | [<---] ET_CONTENT                     TYPE        CUAN_T_DA_CC
+* | [<---] EV_COUNT                       TYPE        CUAN_WECHAT_SYNC_COUNT
+* | [EXC!] WECHAT_CONTENT_SYNC_FAILED
+* | [EXC!] WECHAT_API_ERROR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD sync_media_to_ymkt.
+    DATA:
+      lv_post_para       TYPE        string,
+      lv_count(10)       TYPE        n VALUE '0',
+      lv_total_count(10) TYPE        n,
+      ls_content         TYPE        cuan_s_da_cc,
+      lt_content         TYPE        cuan_t_da_cc, "all request data
+      lt_content_temp    TYPE        cuan_t_da_cc, "one request data
+      lt_db_content_temp TYPE        cuan_t_da_cc, "db data
+      lv_content_id(100) TYPE        c,
+      lv_indexid(2)      TYPE        c,
+      ls_node            TYPE        cl_cuan_wechat_utility=>ty_json_itable,
+      lt_node_tab        TYPE        cl_cuan_wechat_utility=>tt_json_itable,
+      lv_subscribe_time  TYPE string.
+    DATA lv_content_type TYPE cuan_da_cc_type.
+    FIELD-SYMBOLS <ls_content>    TYPE        cuan_s_da_cc.
+
+    DATA lo_wechat_content TYPE REF TO cl_cuan_wechat_content_helper.
+    CREATE OBJECT lo_wechat_content
+      EXPORTING
+        io_srv_mgr = mo_wechat_content.
+    IF iv_type <> 'news' AND iv_type <> 'image'.
+      RETURN.
+    ENDIF.
+*set content obsolete according to type and da key
+
+    CLEAR lt_db_content_temp.
+    lv_content_type = iv_type.
+    CALL METHOD lo_wechat_content->get_content
+      EXPORTING
+        iv_dakey        = iv_dakey
+        iv_cache_type = lv_content_type
+      IMPORTING
+        et_content      = lt_content.
+    LOOP AT lt_content INTO ls_content.
+      ls_content-del_flag = abap_true.
+      MODIFY lt_content FROM ls_content TRANSPORTING del_flag.
+    ENDLOOP.
+    CALL METHOD lo_wechat_content->update_content
+      EXPORTING
+        iv_dakey   = iv_dakey  " Digital Account DB_KEY
+        it_content = lt_content.  " Content Cache Table Type
+    CLEAR:lt_content,ls_content.
+
+    WHILE lv_count < lv_total_count OR lv_total_count IS INITIAL.
+      CLEAR lt_node_tab.
+
+      CONCATENATE '{"type":"' iv_type '","offset":"' lv_count '","count":"20"}' INTO lv_post_para.
+
+      CALL METHOD mo_wechat_api->call_wechat_api
+        EXPORTING
+          iv_dakey               = iv_dakey
+          iv_api_id              = if_cuan_wechat_api=>gs_wechat_api_id-sync_media_to_ymkt
+          iv_post_parameter      = lv_post_para
+        IMPORTING
+          et_data                = lt_node_tab
+        EXCEPTIONS
+          wechat_api_call_failed = 1
+          OTHERS                 = 2.
+      IF sy-subrc <> 0.
+        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+        RAISING wechat_content_sync_failed.
+      ENDIF.
+
+      IF lt_node_tab IS INITIAL.
+        EXIT.
+      ENDIF.
+
+      CLEAR: ls_content , lt_content_temp.
+      LOOP AT lt_node_tab INTO ls_node.
+        CASE ls_node-attribute.
+          WHEN 'item-media_id'.
+            lv_content_id = ls_node-value.
+          WHEN 'item-content-news_item-title'.
+            IF iv_type = 'news'.
+              ls_content-title = ls_node-value.
+              lv_indexid = lv_indexid + 1.
+              ls_content-index_id = lv_indexid.
+            ENDIF.
+          WHEN 'item-name'.
+            IF iv_type = 'image'.
+              ls_content-title = ls_node-value.
+              lv_indexid = lv_indexid + 1.
+              ls_content-index_id = lv_indexid.
+            ENDIF.
+          WHEN 'item-content-news_item-author'.
+            ls_content-author = ls_node-value.
+          WHEN 'item-content-news_item-content'.
+          WHEN 'item-content-news_item-url'.
+            ls_content-preview_url = ls_node-value.
+          WHEN 'item-content-news_item-thumb_url'.
+            IF iv_type = 'news'.
+              ls_content-thumb_image_url = ls_node-value.
+              ls_content-content_id = lv_content_id.
+              ls_content-parent_key = iv_dakey.
+              ls_content-cache_type = iv_type.
+              ls_content-content_type = iv_type.
+              ls_content-del_flag = abap_false.
+              APPEND ls_content TO lt_content.
+              APPEND ls_content TO lt_content_temp.
+            ENDIF.
+          WHEN 'item-update_time'.
+            IF iv_type = 'news'.
+              READ TABLE lt_content ASSIGNING <ls_content> WITH KEY content_id = lv_content_id index_id = 1.
+              CALL METHOD cl_cuan_wechat_utility=>convert_unix_timestamp
+                EXPORTING
+                  iv_secs       = ls_node-value
+                IMPORTING
+                  ev_timestampl = <ls_content>-update_date_time.
+              lv_indexid = 0.
+            ELSEIF iv_type = 'image'.
+              CALL METHOD cl_cuan_wechat_utility=>convert_unix_timestamp
+                EXPORTING
+                  iv_secs       = ls_node-value
+                IMPORTING
+                  ev_timestampl = ls_content-update_date_time.
+            ENDIF.
+          WHEN 'item-url'.
+            IF iv_type = 'image'.
+              ls_content-thumb_image_url = ls_node-value.
+              ls_content-content_id = lv_content_id.
+              ls_content-parent_key = iv_dakey.
+              ls_content-cache_type = iv_type.
+              ls_content-content_type = iv_type.
+              ls_content-del_flag = abap_false.
+              APPEND ls_content TO lt_content.
+              APPEND ls_content TO lt_content_temp.
+              lv_indexid = 0.
+            ENDIF.
+          WHEN 'total_count'.
+            lv_total_count = ls_node-value.
+          WHEN 'item_count'.
+            lv_count = lv_count + ls_node-value.
+          WHEN OTHERS.
+        ENDCASE.
+
+        AT END OF index.
+          CLEAR: ls_content,lv_indexid.
+        ENDAT.
+      ENDLOOP.
+
+      CLEAR lt_db_content_temp.
+      CALL METHOD lo_wechat_content->get_content
+        EXPORTING
+          iv_dakey   = iv_dakey    " Digital Account DB_KEY
+          it_content = lt_content_temp    " Content Cache List
+        IMPORTING
+          et_content = lt_db_content_temp.    " Content Cache Table Type
+      IF lt_db_content_temp IS NOT INITIAL AND iv_sync_all <> 'X'.
+        EXIT.
+      ENDIF.
+    ENDWHILE.
+
+    SORT lt_content.
+    DELETE ADJACENT DUPLICATES FROM lt_content COMPARING ALL FIELDS.
+
+    CALL METHOD lo_wechat_content->update_content
+      EXPORTING
+        iv_dakey   = iv_dakey  " Digital Account DB_KEY
+        it_content = lt_content.  " Content Cache Table Type
+
+    et_content = lt_content.
+    ev_count = lv_count.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->SYNC_SHAKE_PAGE_TO_YMKT
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        TY_DAKEY
+* | [<---] ET_CONTENT                     TYPE        CUAN_T_DA_CC
+* | [<---] EV_COUNT                       TYPE        CUAN_WECHAT_SYNC_COUNT
+* | [EXC!] WECHAT_CONTENT_SYNC_FAILED
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD sync_shake_page_to_ymkt.
+    DATA:
+      lv_post_para TYPE        string,
+      ls_node      TYPE        cl_cuan_wechat_utility=>ty_json_itable,
+      lt_node_tab  TYPE        cl_cuan_wechat_utility=>tt_json_itable,
+      ls_content   TYPE   cuan_s_da_cc,
+      lt_content   TYPE        cuan_t_da_cc,
+      lv_count     TYPE        cuan_wechat_sync_count,
+      lv_begin     TYPE        string VALUE '0'.
+
+    DATA lo_wechat_content TYPE REF TO cl_cuan_wechat_content_helper.
+    CREATE OBJECT lo_wechat_content
+      EXPORTING
+        io_srv_mgr = mo_wechat_content.
+
+*set content obsolete according to type and da key
+    CLEAR lt_content.
+    CALL METHOD lo_wechat_content->get_content
+      EXPORTING
+        iv_dakey        = iv_dakey
+        iv_cache_type = 'shake_page'
+      IMPORTING
+        et_content      = lt_content.
+    LOOP AT lt_content INTO ls_content.
+      ls_content-del_flag = abap_true.
+      MODIFY lt_content FROM ls_content TRANSPORTING del_flag.
+    ENDLOOP.
+    CALL METHOD lo_wechat_content->update_content
+      EXPORTING
+        iv_dakey   = iv_dakey  " Digital Account DB_KEY
+        it_content = lt_content.  " Content Cache Table Type
+    CLEAR:lt_content,ls_content.
+
+    WHILE lv_count IS INITIAL OR lv_count > lines( et_content ).
+      lv_begin = lines( et_content ).
+      CONCATENATE '{"type":' '2' ',"begin": ' lv_begin ',"count": 50 }' INTO lv_post_para.
+      CLEAR lt_node_tab.
+      CALL METHOD mo_wechat_api->call_wechat_api
+        EXPORTING
+          iv_dakey               = iv_dakey
+          iv_api_id              = if_cuan_wechat_api=>gs_wechat_api_id-sync_shake_page_to_ymkt
+          iv_post_parameter      = lv_post_para
+        IMPORTING
+          et_data                = lt_node_tab
+        EXCEPTIONS
+          wechat_api_call_failed = 1
+          OTHERS                 = 2.
+      IF sy-subrc <> 0.
+        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+          WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+          RAISING wechat_content_sync_failed.
+      ENDIF .
+      IF lt_node_tab IS INITIAL.
+        EXIT.
+      ENDIF.
+      CLEAR ls_content.
+      LOOP AT lt_node_tab INTO ls_node.
+        CASE ls_node-attribute.
+          WHEN 'data-pages-comment'.ls_content-comment = ls_node-value.
+          WHEN 'data-pages-page_id'.ls_content-content_id = ls_node-value.
+          WHEN 'data-pages-description'.ls_content-description = ls_node-value.
+          WHEN 'data-pages-icon_url'.ls_content-thumb_image_url = ls_node-value.
+          WHEN 'data-pages-page_url'.ls_content-page_url = ls_node-value.
+          WHEN 'data-pages-title'.
+            ls_content-title = ls_node-value.
+            ls_content-index_id = '1'.
+            ls_content-cache_type = 'shake_page'.
+            ls_content-content_type = 'shake_page'.
+            ls_content-del_flag = abap_false.
+            APPEND ls_content TO lt_content.
+            APPEND ls_content TO et_content.
+            CLEAR ls_content.
+          WHEN 'data-total_count'.
+            lv_count = ls_node-value.
+            IF lv_count IS INITIAL.
+              RETURN.
+            ENDIF.
+          WHEN OTHERS.
+        ENDCASE.
+      ENDLOOP.
+      IF lines( lt_content ) IS INITIAL.
+        RETURN.
+      ENDIF.
+      CLEAR lt_content.
+    ENDWHILE.
+
+    CALL METHOD lo_wechat_content->update_content
+      EXPORTING
+        iv_dakey   = iv_dakey
+        it_content = et_content.
+
+    ev_count = lines( et_content ).
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->SYNC_USER_TO_YMKT
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        TY_DAKEY
+* | [--->] IV_COUNT                       TYPE        INT8(optional)
+* | [--->] IV_IMAGE_FLAG                  TYPE        BOOLEAN(optional)
+* | [--->] IT_OPENID_LIST                 TYPE        TT_USERINFO(optional)
+* | [--->] IV_PERMISSION_FLAG             TYPE        BOOLEAN(optional)
+* | [--->] IV_EXPUSERINF_FLAG             TYPE        BOOLEAN(optional)
+* | [--->] IV_NEXTOPENID                  TYPE        CUAN_WECHAT_OPENID(optional)
+* | [<---] ET_USERINFO                    TYPE        TT_USERINFO
+* | [<---] EV_COUNT                       TYPE        CUAN_WECHAT_SYNC_COUNT
+* | [<---] EV_IMAGE_ERROR_COUNT           TYPE        CUAN_WECHAT_SYNC_COUNT
+* | [<---] EV_IMAGE_EXIST_COUNT           TYPE        CUAN_WECHAT_SYNC_COUNT
+* | [EXC!] WECHAT_API_ERROR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD sync_user_to_ymkt.
+
+    DATA:
+      lv_total        TYPE        i,
+      lv_totalcount   TYPE        string,
+      lv_temptotal    TYPE        string,
+      lv_currentcount TYPE        i VALUE 0,
+      lv_currenttabix TYPE        i VALUE 0,
+      lv_endtabix     TYPE        i,
+      lv_nextopenid   TYPE        cuan_wechat_openid,
+      ls_userlist     TYPE        ty_userinfo,
+      ls_userinfo     TYPE        ty_userinfo,
+      lt_userlist     TYPE        tt_userinfo,
+      lt_userlist_temp TYPE       tt_userinfo,
+      lt_userlist_all TYPE        tt_userinfo,
+      lt_userinfo     TYPE        tt_userinfo.
+
+    FIELD-SYMBOLS <ls_userinfo>     TYPE        ty_userinfo.
+
+    DATA ls_ic_ext TYPE cuan_s_ce_ic_ext_fafl.
+    DATA lt_ic_ext TYPE TABLE OF cuan_s_ce_ic_ext_fafl.
+    DATA ls_ic_fect_ext TYPE cuan_s_ce_ic_facet_add_ext.
+    DATA lt_ic_fect_ext TYPE cuan_t_ce_ic_facet_add_ext.
+    DATA ls_return_ic TYPE cuan_s_ce_contact_key_exp_rfc.
+    DATA lt_return_ic TYPE TABLE OF cuan_s_ce_contact_key_exp_rfc.
+    DATA: ls_message TYPE bapiret2,
+          lt_message TYPE bapiret2_t.
+    DATA: lv_image_contact_key TYPE cuan_s_ce_contact_key_exp_rfc-contact_key.
+
+    DATA: lv_currenttimestamp TYPE timestampl.
+
+    DATA :
+      ls_key        TYPE    /bobf/s_frw_key,
+      lt_key        TYPE    /bobf/t_frw_key,
+      lt_failed_key TYPE    /bobf/t_frw_key,
+      ls_da_root    TYPE cuan_s_da_root,
+      lt_da_root    TYPE cuan_t_da_root.
+
+    GET TIME STAMP FIELD lv_currenttimestamp.
+
+    CLEAR:et_userinfo,ev_count, ev_image_error_count.
+    IF it_openid_list IS NOT INITIAL.
+      lt_userlist_all = it_openid_list.
+      "get user detail
+      CLEAR: lt_userlist,lt_userinfo.
+      LOOP AT lt_userlist_all INTO ls_userlist.
+        APPEND ls_userlist TO lt_userlist.
+        lv_currenttabix = lv_currenttabix + 1.
+        IF ( sy-tabix MOD 100 ) = 0 OR lv_currenttabix >= lines( lt_userlist_all ).
+          CALL METHOD me->get_user_detail_batch
+            EXPORTING
+              it_userinfo = lt_userlist
+              iv_dakey    = iv_dakey
+            IMPORTING
+              et_userinfo = lt_userinfo
+            EXCEPTIONS
+              wechat_api_error = 1
+              OTHERS           = 2.
+          IF sy-subrc <> 0.
+              MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+                RAISING wechat_api_error.
+          ENDIF.
+          IF lt_userinfo IS NOT INITIAL.
+            LOOP AT lt_userinfo INTO ls_userinfo.
+              APPEND ls_userinfo TO et_userinfo.
+            ENDLOOP.
+          ELSE.
+            LOOP AT lt_userlist INTO ls_userinfo.
+              APPEND ls_userinfo TO et_userinfo.
+            ENDLOOP.
+          ENDIF.
+          CLEAR: lt_userlist,lt_userinfo.
+        ENDIF.
+      ENDLOOP.
+
+      "save to contact
+      LOOP AT et_userinfo INTO ls_userinfo.
+        ls_ic_ext-id_origin = if_cuan_wechat_constant=>gc_wechat_open_id.
+        ls_ic_ext-id = ls_userinfo-openid.
+        ls_ic_ext-name_text = ls_userinfo-nickname.
+        IF ls_userinfo-sex <> '0'.
+          ls_ic_ext-sex = ls_userinfo-sex.
+        ENDIF.
+        ls_ic_ext-language_ft = ls_userinfo-language.
+        ls_ic_ext-country_ft = ls_userinfo-country.
+        ls_ic_ext-region_ft = ls_userinfo-province.
+        ls_ic_ext-city1 = ls_userinfo-city.
+        ls_ic_ext-timestamp = lv_currenttimestamp.
+
+        IF ls_userinfo-unionid IS NOT INITIAL.
+          ls_ic_fect_ext-id_origin = if_cuan_wechat_constant=>gc_wechat_union_id.
+          ls_ic_fect_ext-id = ls_userinfo-unionid.
+          ls_ic_fect_ext-opt_in_tmstmp = lv_currenttimestamp.
+          ls_ic_fect_ext-record_idx = sy-tabix.
+          APPEND ls_ic_fect_ext TO lt_ic_fect_ext.
+        ENDIF.
+
+        APPEND ls_ic_ext TO lt_ic_ext.
+
+      ENDLOOP.
+
+      CALL METHOD cl_cuan_ce_ic_post_flat=>contacts_post
+        EXPORTING
+          iv_abort_if_error           = 'X'
+          it_ic_imp_ext_fafl          = lt_ic_ext
+          it_ic_imp_facets_additional = lt_ic_fect_ext
+        IMPORTING
+          et_contact_key              = lt_return_ic
+          et_message                  = lt_message.
+
+
+      LOOP AT lt_return_ic INTO ls_return_ic.
+        CLEAR ls_userinfo.
+        READ TABLE et_userinfo ASSIGNING <ls_userinfo> WITH KEY openid = ls_return_ic-id.
+        IF sy-subrc = 0.
+          <ls_userinfo>-contact_key = ls_return_ic-contact_key.
+        ENDIF.
+      ENDLOOP.
+      CLEAR: lt_return_ic,lt_message,lt_ic_ext,lt_ic_fect_ext.
+
+      IF iv_permission_flag EQ abap_true.
+        CALL METHOD me->update_follow_status
+          EXPORTING
+            iv_dakey       = iv_dakey
+            it_openid_list = et_userinfo.
+      ENDIF.
+
+*      image import
+      IF iv_image_flag = 'X'.
+        LOOP AT et_userinfo ASSIGNING <ls_userinfo>.
+          lv_image_contact_key = <ls_userinfo>-contact_key.
+          CALL METHOD me->fetch_image_to_contact
+            EXPORTING
+              iv_url            = <ls_userinfo>-headimgurl
+              iv_contactkey     = lv_image_contact_key
+            EXCEPTIONS
+              invalid_url       = 1
+              fetch_image_error = 2
+              already_existed   = 3
+              OTHERS            = 4.
+          IF sy-subrc = 3.
+            ev_image_exist_count = ev_image_exist_count + 1.
+          ELSEIF sy-subrc <> 0.
+            ev_image_error_count = ev_image_error_count + 1.
+          ENDIF.
+
+        ENDLOOP.
+      ENDIF.
+      ev_count = lines( et_userinfo ).
+    ELSE.
+      IF iv_nextopenid IS NOT INITIAL.
+        lv_nextopenid = iv_nextopenid.
+      ENDIF.
+      "get user openid list
+      WHILE lv_total > lv_currentcount OR lv_total IS INITIAL.
+        CLEAR: lt_userlist,lt_userlist_temp.
+        CALL METHOD me->get_user_list
+          EXPORTING
+            iv_nextopenid = lv_nextopenid
+            iv_dakey      = iv_dakey
+          IMPORTING
+            ev_nextopenid = lv_nextopenid
+            ev_total      = lv_totalcount
+            ev_count      = lv_temptotal
+            et_userinfo   = lt_userlist
+          EXCEPTIONS
+            wechat_api_error = 1
+            OTHERS           = 2.
+        IF sy-subrc <> 0.
+            MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+              WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+              RAISING wechat_api_error.
+        ENDIF.
+        IF lt_userlist IS NOT INITIAL.
+          lv_total = lv_totalcount.
+        ELSE.
+          EXIT.
+        ENDIF.
+        LOOP AT lt_userlist INTO ls_userlist.
+          APPEND ls_userlist TO lt_userlist_all.
+          lv_currentcount = lv_currentcount + 1.
+          IF lv_currentcount >= iv_count AND iv_count IS NOT INITIAL.
+            EXIT.
+          ENDIF.
+        ENDLOOP.
+ "      get user detail
+        CLEAR: lt_userlist,lt_userinfo.
+        LOOP AT lt_userlist_all INTO ls_userlist.
+          APPEND ls_userlist TO lt_userlist.
+          lv_currenttabix = lv_currenttabix + 1.
+          IF ( sy-tabix MOD 100 ) = 0 OR lv_currenttabix >= lines( lt_userlist_all ).
+            CALL METHOD me->get_user_detail_batch
+              EXPORTING
+                it_userinfo = lt_userlist
+                iv_dakey    = iv_dakey
+              IMPORTING
+                et_userinfo = lt_userinfo
+              EXCEPTIONS
+                wechat_api_error = 1
+                OTHERS           = 2.
+            IF sy-subrc <> 0.
+                MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                  WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+                  RAISING wechat_api_error.
+            ENDIF.
+            IF lt_userinfo IS NOT INITIAL.
+              LOOP AT lt_userinfo INTO ls_userinfo.
+                APPEND ls_userinfo TO lt_userlist_temp.
+              ENDLOOP.
+            ELSE.
+              LOOP AT lt_userlist INTO ls_userinfo.
+                APPEND ls_userinfo TO lt_userlist_temp.
+              ENDLOOP.
+            ENDIF.
+            CLEAR: lt_userlist,lt_userinfo.
+          ENDIF.
+        ENDLOOP.
+        CLEAR: lt_userlist_all.
+
+        "save to contact
+        LOOP AT lt_userlist_temp INTO ls_userinfo.
+          ls_ic_ext-id_origin = if_cuan_wechat_constant=>gc_wechat_open_id.
+          ls_ic_ext-id = ls_userinfo-openid.
+          ls_ic_ext-name_text = ls_userinfo-nickname.
+          IF ls_userinfo-sex <> '0'.
+            ls_ic_ext-sex = ls_userinfo-sex.
+          ENDIF.
+          ls_ic_ext-language_ft = ls_userinfo-language.
+          ls_ic_ext-country_ft = ls_userinfo-country.
+          ls_ic_ext-region_ft = ls_userinfo-province.
+          ls_ic_ext-city1 = ls_userinfo-city.
+          ls_ic_ext-timestamp = lv_currenttimestamp.
+
+          IF ls_userinfo-unionid IS NOT INITIAL.
+            ls_ic_fect_ext-id_origin = if_cuan_wechat_constant=>gc_wechat_union_id.
+            ls_ic_fect_ext-id = ls_userinfo-unionid.
+            ls_ic_fect_ext-opt_in_tmstmp = lv_currenttimestamp.
+            ls_ic_fect_ext-record_idx = sy-tabix.
+            APPEND ls_ic_fect_ext TO lt_ic_fect_ext.
+          ENDIF.
+          APPEND ls_ic_ext TO lt_ic_ext.
+        ENDLOOP.
+
+        CALL METHOD cl_cuan_ce_ic_post_flat=>contacts_post
+          EXPORTING
+            iv_abort_if_error           = 'X'
+            it_ic_imp_ext_fafl          = lt_ic_ext
+            it_ic_imp_facets_additional = lt_ic_fect_ext
+          IMPORTING
+            et_contact_key              = lt_return_ic
+            et_message                  = lt_message.
+
+
+        LOOP AT lt_return_ic INTO ls_return_ic.
+          CLEAR ls_userinfo.
+          READ TABLE lt_userlist_temp ASSIGNING <ls_userinfo> WITH KEY openid = ls_return_ic-id.
+          IF sy-subrc = 0.
+            <ls_userinfo>-contact_key = ls_return_ic-contact_key.
+          ENDIF.
+        ENDLOOP.
+        CLEAR: lt_return_ic,lt_message,lt_ic_ext,lt_ic_ext.
+
+        IF iv_permission_flag EQ abap_true.
+          CALL METHOD me->update_follow_status
+            EXPORTING
+              iv_dakey       = iv_dakey
+              it_openid_list = lt_userlist_temp.
+        ENDIF.
+
+*        image import
+        IF iv_image_flag = 'X'.
+          LOOP AT lt_userlist_temp ASSIGNING <ls_userinfo>.
+            lv_image_contact_key = <ls_userinfo>-contact_key.
+            CALL METHOD me->fetch_image_to_contact
+              EXPORTING
+                iv_url            = <ls_userinfo>-headimgurl
+                iv_contactkey     = lv_image_contact_key
+              EXCEPTIONS
+                invalid_url       = 1
+                fetch_image_error = 2
+                already_existed   = 3
+                OTHERS            = 4.
+            IF sy-subrc = 3.
+              ev_image_exist_count = ev_image_exist_count + 1.
+            ELSEIF sy-subrc <> 0.
+              ev_image_error_count = ev_image_error_count + 1.
+            ENDIF.
+
+          ENDLOOP.
+        ENDIF.
+"       Remove the exporting table if the perfermance is bad
+        IF iv_expuserinf_flag IS INITIAL.
+          ev_count = lines( lt_userlist_temp ) + ev_count.
+        ELSE.
+          APPEND LINES OF lt_userlist_temp TO et_userinfo.
+        ENDIF.
+        IF lv_currentcount >= iv_count AND iv_count IS NOT INITIAL.
+          EXIT.
+        ENDIF.
+        IF iv_nextopenid IS NOT INITIAL.
+          EXIT.
+        ENDIF.
+      ENDWHILE.
+      IF iv_expuserinf_flag IS NOT INITIAL.
+        ev_count = lines( et_userinfo ).
+      ENDIF.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->TEST_CONNECTION
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_APPID                       TYPE        STRING
+* | [--->] IV_SECID                       TYPE        STRING
+* | [<---] EV_TOKEN                       TYPE        STRING
+* | [EXC!] FETCH_TOKEN_ERROR
+* | [EXC!] INVALID_APP_ID
+* | [EXC!] INVALID_APP_SECRET
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD test_connection.
+    "get token from wechat server
+
+    DATA:
+      lv_dakey    TYPE      ty_dakey,
+      lv_get_para TYPE        string,
+      ls_node     TYPE        cl_cuan_wechat_utility=>ty_json_itable,
+      lt_node_tab TYPE        cl_cuan_wechat_utility=>tt_json_itable.
+
+    CONCATENATE 'grant_type=client_credential&appid=' iv_appid '&secret=' iv_secid INTO lv_get_para.
+
+    CALL METHOD mo_wechat_api->call_wechat_api
+      EXPORTING
+        iv_dakey                    = lv_dakey     " Digital Account ID
+        iv_api_id                   = if_cuan_wechat_api=>gs_wechat_api_id-connection_test
+        iv_additional_get_parameter = lv_get_para
+      IMPORTING
+        et_data                     = lt_node_tab
+      EXCEPTIONS
+        wechat_api_call_failed      = 1
+        invalid_app_id              = 2
+        invalid_app_secret          = 3
+        OTHERS                      = 4.
+
+    IF sy-subrc = 1. " API issues besides invalid APP ID & secret
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+        RAISING fetch_token_error.
+    ELSEIF sy-subrc = 2.
+      RAISE invalid_app_id .
+    ELSEIF sy-subrc = 3.
+      RAISE invalid_app_secret .
+    ENDIF.
+
+    READ TABLE lt_node_tab INTO ls_node WITH KEY attribute = 'access_token'.
+
+    IF sy-subrc = 0 AND ls_node-value <> ''.
+      ev_token = ls_node-value.
+    ELSE.
+      RAISE fetch_token_error.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_SERVICES->UPDATE_FOLLOW_STATUS
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        TY_DAKEY
+* | [--->] IT_OPENID_LIST                 TYPE        TT_USERINFO
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD update_follow_status.
+    DATA : lv_optin        TYPE cuan_ce_marketing_optin,
+           ls_da_root      TYPE cuan_s_da_root,
+           lv_comm_cat_key TYPE cuan_s_da_root-comm_cat_key,
+           ls_mod          TYPE /bobf/s_frw_modification,
+           lt_mod          TYPE /bobf/t_frw_modification,
+*Note 2810493 Begin
+           lt_facet_keys   TYPE /bobf/t_frw_key,
+           lt_marketing_area TYPE cuan_t_ce_ic_mkt_area,
+           lr_marketing_area   TYPE REF TO cuan_s_ce_ic_mkt_area,
+           lt_mod2          TYPE /bobf/t_frw_modification,
+*Note 2810493 End
+           lt_mp_root      TYPE cuan_t_ce_mkt_perm_rt,
+           ls_mp_root      TYPE cuan_s_ce_mkt_perm_rt,
+           lt_trq_key      TYPE /bobf/t_frw_key,
+           lr_openid_list  TYPE REF TO ty_userinfo,
+           lr_permission   TYPE REF TO cuan_s_ce_mkt_perm_rt.
+    CONSTANTS: lc_comm_cat_key  TYPE string VALUE 'COMM_CAT_KEY',
+               lc_contact_facet_id TYPE string VALUE 'CONTACT_FACET_ID'.
+
+    DATA:
+      ls_selpar TYPE          /bobf/s_frw_query_selparam,
+      lt_selpar TYPE TABLE OF /bobf/s_frw_query_selparam.
+
+    CLEAR: lt_mod.
+
+    DATA :
+      ls_key        TYPE    /bobf/s_frw_key,
+      lt_key        TYPE    /bobf/t_frw_key,
+      lt_failed_key TYPE    /bobf/t_frw_key,
+      lt_da_info    TYPE cuan_t_da_root.
+
+    DATA(lo_transaction_mgr) = /bobf/cl_tra_trans_mgr_factory=>get_transaction_manager( ).
+    DATA(lo_ic_mgr)          = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_ce_interact_contact_c=>sc_bo_key ).
+    DATA:lt_facet_key    TYPE TABLE OF cuan_s_ce_ic_facet_key,
+         lt_facet_parent TYPE cuan_t_ce_ic_facet_parent_key,
+         ls_facet_parent TYPE cuan_s_ce_ic_facet_parent_key,
+         lv_contact_key  TYPE /bobf/conf_key.
+    DATA : lv_timestamp TYPE timestampl.
+    CONVERT DATE sy-datum TIME sy-uzeit INTO TIME STAMP lv_timestamp TIME ZONE 'UTC'.
+
+    DATA(lo_da_mgr)    = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_digital_account_c=>sc_bo_key ).
+    ls_key-key = iv_dakey.
+    APPEND ls_key TO lt_key.
+    lo_da_mgr->retrieve(
+                      EXPORTING
+                          iv_node_key   =   if_cuan_digital_account_c=>sc_node-root
+                          it_key        =   lt_key
+                          iv_edit_mode  =   /bobf/if_conf_c=>sc_edit_read_only
+                      IMPORTING
+                          et_data         = lt_da_info
+                          et_failed_key   = lt_failed_key ).
+
+    IF lt_da_info IS NOT INITIAL.
+      ls_da_root = lt_da_info[ 1 ].
+    ENDIF.
+
+    lv_comm_cat_key = ls_da_root-comm_cat_key.
+
+    ls_selpar-attribute_name = if_cuan_wechat_constant=>sc_field_name-contact_facet."'CONTACT_FACET_ID_ORIGIN'.
+    ls_selpar-sign = 'I'.
+    ls_selpar-option = 'EQ'.
+    ls_selpar-low = if_cuan_wechat_constant=>sc_field_name-wch_open_id."'WECHAT_OPEN_ID'.
+    APPEND ls_selpar TO lt_selpar.
+
+    CLEAR ls_selpar.
+    ls_selpar-attribute_name = lc_comm_cat_key."'COMM_CAT_KEY'.
+    ls_selpar-sign = 'I'.
+    ls_selpar-option = 'EQ'.
+    ls_selpar-low = lv_comm_cat_key.
+    APPEND ls_selpar TO lt_selpar.
+
+    CLEAR ls_selpar.
+    ls_selpar-attribute_name = lc_comm_cat_key."'COMM_CAT_KEY'.
+    ls_selpar-sign = 'I'.
+    ls_selpar-option = 'EQ'.
+    ls_selpar-low = '00000000000000000000000000000000'.
+    APPEND ls_selpar TO lt_selpar.
+
+    LOOP AT it_openid_list INTO DATA(ls_openid_list).
+      CLEAR ls_selpar.
+      ls_selpar-attribute_name = lc_contact_facet_id."'CONTRACT_FACET_ID"
+      ls_selpar-sign = 'I'.
+      ls_selpar-option = 'EQ'.
+      ls_selpar-low = ls_openid_list-openid.
+      APPEND ls_selpar TO lt_selpar.
+    ENDLOOP.
+
+    DATA(lo_service_mgr)    = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_ce_mkt_permission_c=>sc_bo_key ).
+* get facet service manager
+    DATA(lo_service_mgr_facet)    = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_ce_interact_contact_c=>sc_bo_key ).
+
+* get marketing permission info
+    lo_service_mgr->query(
+      EXPORTING
+        iv_query_key            = if_cuan_ce_mkt_permission_c=>sc_query-root-select_all
+        it_selection_parameters = lt_selpar
+        iv_fill_data            = abap_true
+      IMPORTING
+        et_data                 = lt_mp_root
+        et_key                  = lt_trq_key ).
+
+*   Implicit permissions adjustment
+    DELETE lt_mp_root WHERE is_implicit = abap_true.
+
+    LOOP AT it_openid_list REFERENCE INTO lr_openid_list.
+      IF lr_openid_list->subscribe = if_cuan_wechat_constant=>sc_follow_status-subscribe."'1'.
+        lv_optin = 'Y'.
+      ELSE.
+        lv_optin = 'N'.
+      ENDIF.
+
+      "digital account category
+      CLEAR: ls_mod.
+      CREATE DATA lr_permission.
+*fetch contact key
+      CLEAR:lv_contact_key,lt_facet_key,lt_facet_parent,ls_facet_parent.
+      APPEND VALUE #( id_origin = 'WECHAT_OPEN_ID'
+                      id = lr_openid_list->openid ) TO lt_facet_key.
+      CALL METHOD lo_ic_mgr->convert_altern_key
+        EXPORTING
+          iv_node_key          = if_cuan_ce_interact_contact_c=>sc_node-facet
+          iv_altkey_key        = if_cuan_ce_interact_contact_c=>sc_alternative_key-facet-ic_facet_key
+          iv_target_altkey_key = if_cuan_ce_interact_contact_c=>sc_alternative_key-facet-parent_key
+          it_key               = lt_facet_key
+        IMPORTING
+          et_key               = lt_facet_parent.
+      READ TABLE lt_facet_parent INTO ls_facet_parent INDEX 1.
+      IF sy-subrc = 0.
+        lv_contact_key = ls_facet_parent-parent_key.
+      ENDIF.
+      READ TABLE lt_mp_root INTO ls_mp_root WITH KEY contact_facet_id = lr_openid_list->openid comm_cat_key = lv_comm_cat_key.
+      IF sy-subrc = 0.
+        GET REFERENCE OF ls_mp_root INTO lr_permission.
+        APPEND if_cuan_ce_mkt_permission_c=>sc_node_attribute-root-opt_in TO ls_mod-changed_fields.
+        APPEND if_cuan_ce_mkt_permission_c=>sc_node_attribute-root-ia_timestamp TO ls_mod-changed_fields.
+        ls_mod-change_mode =  /bobf/if_frw_c=>sc_modify_update.
+        ls_mod-key = ls_mp_root-key.
+        ls_mod-root_key = ls_mp_root-key.
+      ELSE.
+        lr_permission->key = /bobf/cl_frw_factory=>get_new_key( ).
+        lr_permission->comm_cat_key = lv_comm_cat_key.
+        lr_permission->contact_facet_id = lr_openid_list->openid.
+        lr_permission->contact_facet_id_origin = if_cuan_wechat_constant=>gc_wechat_open_id.
+        lr_permission->contact_key = lr_openid_list->contact_key.
+        lr_permission->comm_medium = if_cuan_wechat_constant=>sc_com_medium-wec.
+        lr_permission->comm_direction = 'O'.
+        lr_permission->outbound_comm_medium = if_cuan_wechat_constant=>sc_mkt_com_medium-wec.
+        lr_permission->mkt_area_id = ls_da_root-mkt_area_id.
+        ls_mod-change_mode =  /bobf/if_frw_c=>sc_modify_create.
+        ls_mod-key = lr_permission->key.
+        ls_mod-root_key = lr_permission->key.
+      ENDIF.
+      IF lr_permission->contact_key IS INITIAL.
+        lr_permission->contact_key = lv_contact_key.
+      ENDIF.
+      lr_permission->ia_timestamp = lv_timestamp.
+      lr_permission->opt_in = lv_optin.
+      ls_mod-node = if_cuan_ce_mkt_permission_c=>sc_node-root.
+      ls_mod-data = lr_permission.
+      APPEND ls_mod TO lt_mod.
+
+      "empty category
+      CLEAR: ls_mod.
+      CREATE DATA lr_permission.
+      READ TABLE lt_mp_root INTO ls_mp_root WITH KEY contact_facet_id = lr_openid_list->openid comm_cat_key = '00000000000000000000000000000000'.
+      IF sy-subrc = 0.
+        GET REFERENCE OF ls_mp_root INTO lr_permission.
+        APPEND if_cuan_ce_mkt_permission_c=>sc_node_attribute-root-opt_in TO ls_mod-changed_fields.
+        APPEND if_cuan_ce_mkt_permission_c=>sc_node_attribute-root-ia_timestamp TO ls_mod-changed_fields.
+        ls_mod-change_mode =  /bobf/if_frw_c=>sc_modify_update.
+        ls_mod-key = ls_mp_root-key.
+        ls_mod-root_key = ls_mp_root-key.
+      ELSE.
+        lr_permission->key = /bobf/cl_frw_factory=>get_new_key( ).
+        lr_permission->comm_cat_key = '00000000000000000000000000000000'.
+        lr_permission->contact_facet_id = lr_openid_list->openid.
+        lr_permission->contact_facet_id_origin = if_cuan_wechat_constant=>gc_wechat_open_id.
+        lr_permission->contact_key = lr_openid_list->contact_key.
+        lr_permission->comm_medium = if_cuan_wechat_constant=>sc_com_medium-wec.
+        lr_permission->comm_direction = 'O'.
+        lr_permission->outbound_comm_medium = if_cuan_wechat_constant=>sc_mkt_com_medium-wec.
+        lr_permission->mkt_area_id = ls_da_root-mkt_area_id.
+        ls_mod-change_mode =  /bobf/if_frw_c=>sc_modify_create.
+        ls_mod-key = lr_permission->key.
+        ls_mod-root_key = lr_permission->key.
+      ENDIF.
+      IF lr_permission->contact_key IS INITIAL.
+        lr_permission->contact_key = lv_contact_key.
+      ENDIF.
+      lr_permission->ia_timestamp = lv_timestamp.
+      lr_permission->opt_in = lv_optin.
+      ls_mod-node = if_cuan_ce_mkt_permission_c=>sc_node-root.
+      ls_mod-data = lr_permission.
+      APPEND ls_mod TO lt_mod.
+
+*Note 2810493 Begin
+      "Add Marketing area of the communication category of the subscription to the corresponding interaction contact facet
+      CLEAR: ls_mod, lt_facet_keys.
+      CREATE DATA lr_marketing_area.
+      lo_ic_mgr->convert_altern_key(
+        EXPORTING
+          iv_node_key          = if_cuan_ce_interact_contact_c=>sc_node-facet
+          iv_altkey_key        = if_cuan_ce_interact_contact_c=>sc_alternative_key-facet-ic_facet_key
+          it_key               = lt_facet_key
+        IMPORTING
+          et_key               = lt_facet_keys ).
+      IF lt_facet_keys IS NOT INITIAL AND lt_facet_keys[ 1 ]-key IS NOT INITIAL.
+        lo_ic_mgr->retrieve_by_association(
+          EXPORTING iv_node_key = if_cuan_ce_interact_contact_c=>sc_node-facet
+                  it_key = lt_facet_keys
+                  iv_association = if_cuan_ce_interact_contact_c=>sc_association-facet-marketing_area
+                  iv_fill_data = abap_true
+         IMPORTING et_data = lt_marketing_area ).
+        READ TABLE lt_marketing_area TRANSPORTING NO FIELDS with key mkt_area_id = ls_da_root-mkt_area_id.
+        IF sy-subrc <> 0.
+          lr_marketing_area->key        = /bobf/cl_frw_factory=>get_new_key( ).
+          lr_marketing_area->parent_key =  lt_facet_keys[ 1 ]-key.
+          lr_marketing_area->root_key   = lv_contact_key.
+          lr_marketing_area->mkt_area_id = ls_da_root-mkt_area_id.
+          lr_marketing_area->foreign_import = 'X'.
+          ls_mod-change_mode =  /bobf/if_frw_c=>sc_modify_create.
+          ls_mod-key = lr_marketing_area->key.
+          ls_mod-association = if_cuan_ce_interact_contact_c=>sc_association-facet-marketing_area.
+          ls_mod-source_node = if_cuan_ce_interact_contact_c=>sc_node-facet.
+          ls_mod-source_key  = lr_marketing_area->parent_key.
+          ls_mod-node = if_cuan_ce_interact_contact_c=>sc_node-marketing_area.
+          ls_mod-data = lr_marketing_area.
+          APPEND ls_mod TO lt_mod2.
+        ENDIF.
+      ENDIF.
+*Note 2810493 End
+    ENDLOOP.
+
+    SORT: lt_mod, lt_mod2.
+    DELETE ADJACENT DUPLICATES FROM: lt_mod , lt_mod2.
+* do modify to create/update the perminssion status.
+
+    lo_service_mgr->modify(
+      EXPORTING
+        it_modification = lt_mod
+        IMPORTING
+          eo_change = DATA(lo_change)
+          eo_message = DATA(lo_message) ).
+*Note 2810493 Begin
+    IF lt_mod2 IS NOT INITIAL.
+      lo_ic_mgr->modify(
+        EXPORTING
+          it_modification = lt_mod2
+        IMPORTING
+          eo_change = DATA(lo_change2)
+          eo_message = DATA(lo_message2) ).
+     ENDIF.
+*Note 2810493 End
+* save the modification
+    lo_transaction_mgr->save( ).
+
+  ENDMETHOD.
+ENDCLASS.

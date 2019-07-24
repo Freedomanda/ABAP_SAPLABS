@@ -1,0 +1,33 @@
+  METHOD get_token_from_ext.
+    DATA: lb_token_badi        TYPE  REF TO cuan_da_get_access_token,
+          lv_appid             TYPE cuan_digital_account_appid,
+          lv_securityid        TYPE cuan_digital_account_secid,
+          lx_ble_runtime_error TYPE REF TO cx_ble_runtime_error,
+          lx_root              TYPE REF TO cx_root.
+
+    lv_appid = iv_app_id.
+    lv_securityid = iv_securityid.
+    TRY.
+        GET BADI lb_token_badi.
+      CATCH cx_root INTO lx_root.
+    ENDTRY.
+
+    IF lb_token_badi IS BOUND.
+      TRY.
+          CALL BADI lb_token_badi->fetch_token_from_ext_server
+            EXPORTING
+              digital_account = iv_dakey
+              app_id          = lv_appid
+              app_secret      = lv_securityid
+            CHANGING
+              access_token    = ev_token
+              expires_in      = ev_expires_in.
+        CATCH cx_ble_runtime_error INTO lx_ble_runtime_error.
+      ENDTRY.
+
+      IF lx_ble_runtime_error IS NOT INITIAL OR lx_root IS NOT INITIAL.
+        RAISE fetch_token_error.
+      ENDIF.
+    ENDIF.
+
+  ENDMETHOD.

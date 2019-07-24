@@ -1,0 +1,24 @@
+IT_DATA	TYPE SRT_XML_DATA_TAB	XML Tag
+EV_STRING	TYPE STRING	Output string
+
+
+
+  METHOD convert_text_to_string.
+
+    DATA: ls_data TYPE srt_xml_data.
+    CLEAR: ev_string.
+
+    LOOP AT it_data INTO ls_data.
+
+      AT FIRST.
+        CONTINUE.
+      ENDAT.
+      AT LAST.
+        CONTINUE.
+      ENDAT.
+
+      CONCATENATE ev_string '<' ls_data-tag_name '><' ls_data-tag_value '>' INTO ev_string.
+
+    ENDLOOP.
+
+  ENDMETHOD.

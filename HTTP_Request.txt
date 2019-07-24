@@ -1,0 +1,1628 @@
+class CL_CUAN_WECHAT_API definition
+  public
+  final
+  create public .
+
+public section.
+
+  interfaces IF_CUAN_WECHAT_API .
+
+  types:
+    BEGIN OF ty_ca,
+        uuid TYPE   /bobf/conf_key,
+        name TYPE   text80 , "APS_CA_NAME
+      END OF ty_ca .
+  types:
+    tt_ca        TYPE STANDARD TABLE OF ty_ca WITH KEY uuid .
+
+  class-data GT_MESSAGE type BAL_TT_MSG .
+
+  class-methods IS_TOKEN_BADI_IMPLEMENTED
+    returning
+      value(RV_RESULT) type ABAP_BOOL .
+  class-methods GET_WECHAT_API_ERROR_DESC
+    importing
+      !IV_ERROR_CODE type STRING
+    returning
+      value(RV_ERROR_DESCRIPTION) type STRING .
+protected section.
+private section.
+
+  class-data GV_PROXY_HOST type STRING value '' ##NO_TEXT.
+  class-data GV_PROXY_SERVICE type STRING value '' ##NO_TEXT.
+  constants:
+    BEGIN OF gs_wechat_api_url_prefix,
+      get_token           TYPE string VALUE 'https://api.weixin.qq.com/cgi-bin/token?',
+      get_user            TYPE string VALUE 'https://api.weixin.qq.com/cgi-bin/user/get?',
+      get_user_info       TYPE string VALUE 'https://api.weixin.qq.com/cgi-bin/user/info?',
+      send_custom_msg     TYPE string VALUE 'https://api.weixin.qq.com/cgi-bin/message/custom/send?',
+      send_mass_msg       TYPE string VALUE 'https://api.weixin.qq.com/cgi-bin/message/mass/send?',
+      batch_get_user_info TYPE string VALUE 'https://api.weixin.qq.com/cgi-bin/user/info/batchget?',
+      batch_get_material  TYPE string VALUE 'https://api.weixin.qq.com/cgi-bin/material/batchget_material?',
+      batch_get_card      TYPE string VALUE 'https://api.weixin.qq.com/card/batchget?',
+      get_card            TYPE string VALUE 'https://api.weixin.qq.com/card/get?',
+      get_article_summary TYPE string VALUE 'https://api.weixin.qq.com/datacube/getarticlesummary?',
+      get_poi_list        TYPE string VALUE 'https://api.weixin.qq.com/wxa/get_store_list?',
+      get_poi_list_old    TYPE string VALUE 'https://api.weixin.qq.com/cgi-bin/poi/getpoilist?',
+      search_device       TYPE string VALUE 'https://api.weixin.qq.com/shakearound/device/search?',
+      search_page         TYPE string VALUE 'https://api.weixin.qq.com/shakearound/page/search?',
+    END OF gs_wechat_api_url_prefix .
+  constants:
+    BEGIN OF gs_wechat_api_service_id,
+      get_token           TYPE numc4 VALUE 1,
+      get_user            TYPE numc4 VALUE 2,
+      get_user_info       TYPE numc4 VALUE 3,
+      send_custom_msg     TYPE numc4 VALUE 4,
+      send_mass_msg       TYPE numc4 VALUE 5,
+      batch_get_user_info TYPE numc4 VALUE 6,
+      batch_get_material  TYPE numc4 VALUE 7,
+      batch_get_card      TYPE numc4 VALUE 8,
+      get_card            TYPE numc4 VALUE 9,
+      get_article_summary TYPE numc4 VALUE 10,
+      get_poi_list        TYPE numc4 VALUE 11,
+      search_device       TYPE numc4 VALUE 12,
+      search_page         TYPE numc4 VALUE 13,
+      get_poi_list_old    TYPE numc4 VALUE 14,
+    END OF gs_wechat_api_service_id .
+  constants:
+    BEGIN OF gs_wechat_api_error_desc,
+      ec40001 TYPE string VALUE 'Verification failed'  ##NO_TEXT,
+      ec40002 TYPE string VALUE 'Invalid certificate type'  ##NO_TEXT,
+      ec40003 TYPE string VALUE 'Invalid open ID'  ##NO_TEXT,
+      ec40013 TYPE string VALUE 'Invalid App ID'  ##NO_TEXT,
+      ec40014 TYPE string VALUE 'Invalid access token'  ##NO_TEXT,
+      ec40030 TYPE string VALUE 'Invalid refresh token'  ##NO_TEXT,
+      ec40031 TYPE string VALUE 'Invalid openid list'  ##NO_TEXT,
+      ec48001 TYPE string VALUE 'Unauthorized API function' ##NO_TEXT,
+      ec40125 TYPE string VALUE 'Invalid App secret' ##NO_TEXT,
+      ec45009 TYPE string VALUE 'Too many interface call' ##NO_TEXT,
+      ec50001 TYPE string VALUE 'Unauthorized API' ##NO_TEXT,
+      ec45065 TYPE string VALUE 'The same message was sent a short while ago. Try again later' ##NO_TEXT,"clientmsgid exist
+    END OF gs_wechat_api_error_desc .
+
+  methods SEND_POST_REQUEST_BATCH
+    importing
+      !IO_HTTP_CLIENT type ref to IF_HTTP_CLIENT
+    changing
+      !CT_POST_DATA type IF_CUAN_WECHAT_API=>TT_POST_DATA
+    exceptions
+      HTTP_REQUEST_FAIL
+      INVALID_TOKEN .
+  methods FETCH_TOKEN_FROM_WECHAT
+    importing
+      !IV_DAKEY type CUAN_WECHAT_DAKEY
+    exporting
+      !EV_TOKEN type CUAN_DA_TOKEN
+    exceptions
+      FETCH_TOKEN_FAIL .
+  methods FETCH_TOKEN_FROM_DB
+    importing
+      !IV_DAKEY type CUAN_WECHAT_DAKEY
+    exporting
+      !EV_EXPIRES_TIME type TIMESTAMPL
+      !EV_TOKEN type CUAN_DA_TOKEN
+      !ET_MESSAGE type BAL_TT_MSG
+    exceptions
+      INVALID_DIGITAL_ACCOUNT
+      DIGITAL_ACCOUNT_ERROR .
+  methods UPDATE_TOKEN_TO_DB
+    importing
+      !IV_DAKEY type CUAN_WECHAT_DAKEY
+      !IV_EXPIRE_TSTMP type TIMESTAMPL
+      !IV_TOKEN_SEC_ID type GUID_32
+      !IV_TOKEN type CUAN_DA_TOKEN
+      !IV_VERSION type CHAR1 optional
+    exceptions
+      WECHAT_API_ERROR .
+  methods GET_TOKEN_FROM_EXT
+    importing
+      !IV_DAKEY type CUAN_WECHAT_DAKEY
+      !IV_APP_ID type STRING optional
+      !IV_SECURITYID type STRING optional
+    exporting
+      !EV_TOKEN type CUAN_DA_TOKEN
+      !EV_EXPIRES_IN type I
+    exceptions
+      FETCH_TOKEN_ERROR .
+ENDCLASS.
+
+
+
+CLASS CL_CUAN_WECHAT_API IMPLEMENTATION.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method CL_CUAN_WECHAT_API->FETCH_TOKEN_FROM_DB
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        CUAN_WECHAT_DAKEY
+* | [<---] EV_EXPIRES_TIME                TYPE        TIMESTAMPL
+* | [<---] EV_TOKEN                       TYPE        CUAN_DA_TOKEN
+* | [<---] ET_MESSAGE                     TYPE        BAL_TT_MSG
+* | [EXC!] INVALID_DIGITAL_ACCOUNT
+* | [EXC!] DIGITAL_ACCOUNT_ERROR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD fetch_token_from_db.
+* --------------------------------------------------------------------------------------
+* This method return cached access token from secure store by Digital Account UUID input
+* alone with the expiration time of the access token
+* --------------------------------------------------------------------------------------
+
+
+    DATA:
+      lt_da_root    TYPE    cuan_t_da_root,
+      ls_da_root    TYPE    cuan_s_da_root,
+      ls_key        TYPE    /bobf/s_frw_key,
+      lt_key        TYPE    /bobf/t_frw_key,
+      lt_failed_key TYPE    /bobf/t_frw_key,
+      lt_da_info    TYPE cuan_t_da_root.
+
+    DATA: lv_token_sec_id     TYPE guid_32,
+          lv_token_sec_string TYPE string,
+          lv_db_exp_time_c    TYPE string.
+
+
+    DATA:lt_credential TYPE cuan_t_ext_to_da,
+         ls_credential TYPE cuan_s_ext_to_da.
+
+    DATA:lr_digacc_api     TYPE REF TO   cl_cuan_digacc_api.
+         lr_digacc_api = cl_cuan_digacc_api=>get_instance( ).
+    TRY .
+        CALL METHOD lr_digacc_api->get_da_credentials
+          EXPORTING
+            iv_key        = iv_dakey
+          IMPORTING
+            et_credential = lt_credential.
+      CATCH cx_cuan_digital_account.
+        RETURN.
+    ENDTRY.
+
+    READ TABLE lt_credential INTO ls_credential WITH KEY attribute_name = 'ACCESS_TOKEN'.
+    IF sy-subrc = 0.
+      SPLIT ls_credential-attribute_value AT ';' INTO lv_db_exp_time_c ev_token.
+      IF lv_db_exp_time_c IS NOT INITIAL.
+        ev_expires_time = lv_db_exp_time_c.
+      ENDIF.
+    ELSE.
+* --------------------------------------------------------------------------------------
+* Get Digital Account information by Digital Account UUID
+* --------------------------------------------------------------------------------------
+      DATA(lo_service_mgr)    = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_digital_account_c=>sc_bo_key ).
+      ls_key-key = iv_dakey.
+      APPEND ls_key TO lt_key.
+      lo_service_mgr->retrieve(
+                        EXPORTING
+                            iv_node_key   =   if_cuan_digital_account_c=>sc_node-root
+                            it_key        =   lt_key
+                            iv_edit_mode  =   /bobf/if_conf_c=>sc_edit_read_only
+                        IMPORTING
+                            et_data         = lt_da_info
+                            et_failed_key   = lt_failed_key ).
+
+      IF lt_da_info IS NOT INITIAL.
+        ls_da_root = lt_da_info[ 1 ].
+      ENDIF.
+
+* --------------------------------------------------------------------------------------
+* Digital Account should be in a activated status
+* --------------------------------------------------------------------------------------
+      IF ls_da_root-status <> if_cuan_digital_account=>gc_digacc_status_active.
+        MESSAGE i038(cuan_wechat) RAISING invalid_digital_account.
+      ENDIF.
+
+* --------------------------------------------------------------------------------------
+* Get cached access token and expiration time from secure store with secure ID
+* --------------------------------------------------------------------------------------
+      lv_token_sec_id = ls_da_root-secsto_outtoken.
+      IF lv_token_sec_id IS NOT INITIAL.
+        TRY .
+            CALL METHOD cl_cuan_digacc_prov=>sec_read_api
+              EXPORTING
+                iv_id   = lv_token_sec_id
+                iv_dir  = cl_cuan_digacc_prov=>gc_prefix_subout
+              IMPORTING
+                ev_data = lv_token_sec_string.
+          CATCH cx_cuan_digital_account.
+            MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                       WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING digital_account_error.
+        ENDTRY.
+
+        SPLIT lv_token_sec_string AT ';' INTO lv_db_exp_time_c ev_token.
+        IF lv_db_exp_time_c IS NOT INITIAL.
+          ev_expires_time = lv_db_exp_time_c.
+        ENDIF.
+      ENDIF.
+    ENDIF.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method CL_CUAN_WECHAT_API->FETCH_TOKEN_FROM_WECHAT
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        CUAN_WECHAT_DAKEY
+* | [<---] EV_TOKEN                       TYPE        CUAN_DA_TOKEN
+* | [EXC!] FETCH_TOKEN_FAIL
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD fetch_token_from_wechat.
+* -------------------------------------------------------------------------
+* This method generates a new access token from WeChat
+* This method acts differently on On-Promise and Cloud Edition
+* -------------------------------------------------------------------------
+
+
+    DATA:
+      lv_app_id       TYPE        string,
+      lv_securityid   TYPE        string,
+      lv_token_sec_id TYPE        guid_32,
+      lv_url          TYPE        string,
+      ls_node         TYPE        cl_cuan_wechat_utility=>ty_json_itable,
+      lt_node_tab     TYPE        cl_cuan_wechat_utility=>tt_json_itable,
+      lv_response     TYPE         string,
+      lv_expire_time  TYPE        i,
+      lv_timestamp    TYPE        timestampl,
+      lv_syts         TYPE        timestampl,
+      ls_da_root      TYPE        cuan_s_da_root,
+      lv_wait_lock    TYPE        i VALUE 0,
+      lb_token_badi   TYPE REF TO cuan_da_get_access_token.
+
+    DATA :
+      ls_key        TYPE    /bobf/s_frw_key,
+      lt_key        TYPE    /bobf/t_frw_key,
+      lt_failed_key TYPE    /bobf/t_frw_key,
+      lt_da_info    TYPE cuan_t_da_root.
+
+    DATA lo_http_client TYPE REF TO if_http_client.
+    DATA lv_get_parameter TYPE string.
+
+    DATA: lv_error_code TYPE string,
+          lv_error_desc TYPE string.
+
+    DATA:lt_da_ext_attr TYPE STANDARD TABLE OF cuan_s_ext_to_da,
+         ls_da_ext_attr LIKE LINE OF lt_da_ext_attr,
+         lv_data        TYPE string,
+         lv_mark        TYPE char1.
+* -------------------------------------------------------------------------
+* Lock to avoid duplicate generating access token
+* -------------------------------------------------------------------------
+    CALL FUNCTION 'ENQUEUE_E_CUAN_NTWRK_TKN'
+      EXPORTING
+        mandt          = sy-mandt     " 01th enqueue argument
+        da_key         = iv_dakey    " 02th enqueue argument
+      EXCEPTIONS
+        foreign_lock   = 1
+        system_failure = 2
+        OTHERS         = 3.
+
+    IF sy-subrc <> 0.
+      WHILE lv_wait_lock < 20. "waiting for other process unlock and read exist token
+        WAIT UP TO 1 SECONDS.
+        CALL FUNCTION 'ENQUEUE_E_CUAN_NTWRK_TKN'
+          EXPORTING
+            mode_cuan_s_ntwrk_token_lock = 'U'
+            mandt                        = sy-mandt
+            da_key                       = iv_dakey
+          EXCEPTIONS
+            foreign_lock                 = 1
+            system_failure               = 2
+            OTHERS                       = 3.
+        IF sy-subrc <> 0.
+          lv_wait_lock = lv_wait_lock + 1.
+        ELSE.
+          CALL METHOD me->fetch_token_from_db
+            EXPORTING
+              iv_dakey = iv_dakey
+            IMPORTING
+              ev_token = ev_token.
+          RETURN.
+        ENDIF.
+      ENDWHILE.
+
+      MESSAGE e022(cuan_wechat) RAISING fetch_token_fail.
+    ENDIF.
+
+* -------------------------------------------------------------------------
+* Get Digital Account information from BO by Digital Account UUID
+* -------------------------------------------------------------------------
+    DATA(lo_da_mgr)    = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_digital_account_c=>sc_bo_key ).
+    ls_key-key = iv_dakey.
+    APPEND ls_key TO lt_key.
+    lo_da_mgr->retrieve(
+                      EXPORTING
+                          iv_node_key   =   if_cuan_digital_account_c=>sc_node-root
+                          it_key        =   lt_key
+                          iv_edit_mode  =   /bobf/if_conf_c=>sc_edit_read_only
+                      IMPORTING
+                          et_data         = lt_da_info
+                          et_failed_key   = lt_failed_key ).
+
+    IF lt_da_info IS NOT INITIAL.
+      ls_da_root = lt_da_info[ 1 ].
+    ENDIF.
+
+
+*********************************************************************************************
+*if credential fields is not exist in CUAND_DA_ROOT then fetch values from extended attribute
+
+    "CLEAR lv_mark.
+    CALL METHOD cl_cuan_digacc_api=>get_instance
+      RECEIVING
+        ro_instance = DATA(lo_digacc_api).
+    TRY.
+        CALL METHOD lo_digacc_api->get_da_credentials
+          EXPORTING
+            iv_key        = ls_da_root-key
+          IMPORTING
+            et_credential = DATA(lt_credential).
+      CATCH cx_cuan_digital_account .
+    ENDTRY.
+    LOOP AT lt_credential INTO DATA(ls_credential).
+      CASE ls_credential-attribute_name.
+        WHEN 'ACCESS_TOKEN'.
+          lv_token_sec_id = ls_credential-attribute_secure_ref.
+        WHEN 'APP_ID'.
+          lv_app_id = ls_credential-attribute_value.
+        WHEN 'APP_SECRET'.
+          lv_securityid = ls_credential-attribute_value.
+        WHEN OTHERS.
+      ENDCASE.
+    ENDLOOP.
+
+*********************************************************************************************
+
+    IF is_token_badi_implemented( ). " get token from external sever
+      me->get_token_from_ext( EXPORTING iv_dakey = iv_dakey  iv_app_id = lv_app_id iv_securityid = lv_securityid
+       IMPORTING ev_token = ev_token ev_expires_in = lv_expire_time ).
+
+* -------------------------------------------------------------------------
+* Generate a new access token from WeChat
+* -------------------------------------------------------------------------
+    ELSE.
+* -------------------------------------------------------------------------
+* Send HTTP request without body content
+* And convert response data
+* -------------------------------------------------------------------------
+      CONCATENATE 'grant_type=client_credential&appid=' lv_app_id '&secret=' lv_securityid INTO lv_get_parameter.
+
+
+      CALL METHOD if_cuan_wechat_api~create_http_connection
+        EXPORTING
+          iv_api_id      = if_cuan_wechat_api=>gs_wechat_api_id-get_access_token
+          iv_http_header = lv_get_parameter
+        RECEIVING
+          eo_http_client = lo_http_client
+        EXCEPTIONS
+          http_client_creation_failed = 1
+          invalid_init_api_id         = 2
+          invalid_http_headers        = 3
+          fail_to_read_ca             = 4
+          cx_cuan_digital_account     = 5
+          others                      = 6.
+
+      IF sy-subrc <> 0.
+        CALL FUNCTION 'DEQUEUE_E_CUAN_NTWRK_TKN'
+         EXPORTING
+           mandt  = sy-mandt
+           da_key = iv_dakey.
+
+        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+        RAISING fetch_token_fail.
+      ENDIF.
+
+      CALL METHOD if_cuan_wechat_api~send_http_request
+        EXPORTING
+          io_http_client         = lo_http_client
+        IMPORTING
+          ev_response            = lv_response
+        EXCEPTIONS
+          http_request_send_fail = 1.
+
+      IF sy-subrc <> 0.
+        CALL FUNCTION 'DEQUEUE_E_CUAN_NTWRK_TKN'
+         EXPORTING
+           mandt  = sy-mandt
+           da_key = iv_dakey.
+
+        MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+        WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+        RAISING fetch_token_fail.
+      ENDIF.
+
+* -------------------------------------------------------------------------
+* Convert raw response to formatted data
+* -------------------------------------------------------------------------
+      CALL METHOD cl_cuan_wechat_utility=>json_to_itable
+        EXPORTING
+          iv_json          = lv_response
+        IMPORTING
+          et_json_itable   = lt_node_tab
+        EXCEPTIONS
+          json_parse_error = 1
+          OTHERS           = 2.
+
+      lv_error_code = ls_node-value.
+      READ TABLE lt_node_tab INTO ls_node WITH KEY attribute = 'errcode'.
+      IF sy-subrc = 0 AND ls_node-value <> '0'.
+        lv_error_desc = get_wechat_api_error_desc( lv_error_code ).
+        CALL FUNCTION 'DEQUEUE_E_CUAN_NTWRK_TKN'
+          EXPORTING
+            mandt  = sy-mandt
+            da_key = iv_dakey.
+        MESSAGE e000(cuan_wechat) WITH ls_node-value lv_error_desc RAISING fetch_token_fail.
+      ENDIF.
+
+      READ TABLE lt_node_tab INTO ls_node WITH KEY attribute = 'access_token'.
+      IF sy-subrc = 0 AND ls_node-value <> ''.
+        ev_token = ls_node-value.
+        READ TABLE lt_node_tab INTO ls_node WITH KEY attribute = 'expires_in'.
+        lv_expire_time = ls_node-value.
+      ELSE.
+        CALL FUNCTION 'DEQUEUE_E_CUAN_NTWRK_TKN'
+          EXPORTING
+            mandt  = sy-mandt
+            da_key = iv_dakey.
+        RAISE fetch_token_fail.
+      ENDIF.
+    ENDIF.
+
+* -------------------------------------------------------------------------
+* Calculate expiration time
+* -------------------------------------------------------------------------
+    GET TIME STAMP FIELD lv_syts.
+    lv_timestamp = cl_abap_tstmp=>add(
+      EXPORTING
+        tstmp = lv_syts
+        secs = lv_expire_time
+        ).
+
+* -------------------------------------------------------------------------
+* Store new access token
+* -------------------------------------------------------------------------
+    CALL METHOD me->update_token_to_db
+      EXPORTING
+        iv_dakey        = iv_dakey  " Digital Account DB_KEY
+        iv_expire_tstmp = lv_timestamp  " UTC Time Stamp in Long Form (YYYYMMDDhhmmssmmmuuun)
+        iv_token_sec_id = lv_token_sec_id
+        iv_token        = ev_token  " char120
+        iv_version      = 'X'.
+
+* -------------------------------------------------------------------------
+* Unlock
+* -------------------------------------------------------------------------
+    CALL FUNCTION 'DEQUEUE_E_CUAN_NTWRK_TKN'
+      EXPORTING
+        mandt  = sy-mandt
+        da_key = iv_dakey.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method CL_CUAN_WECHAT_API->GET_TOKEN_FROM_EXT
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        CUAN_WECHAT_DAKEY
+* | [--->] IV_APP_ID                      TYPE        STRING(optional)
+* | [--->] IV_SECURITYID                  TYPE        STRING(optional)
+* | [<---] EV_TOKEN                       TYPE        CUAN_DA_TOKEN
+* | [<---] EV_EXPIRES_IN                  TYPE        I
+* | [EXC!] FETCH_TOKEN_ERROR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_token_from_ext.
+    DATA: lb_token_badi        TYPE  REF TO cuan_da_get_access_token,
+          lv_appid             TYPE cuan_digital_account_appid,
+          lv_securityid        TYPE cuan_digital_account_secid,
+          lx_ble_runtime_error TYPE REF TO cx_ble_runtime_error,
+          lx_root              TYPE REF TO cx_root.
+
+    lv_appid = iv_app_id.
+    lv_securityid = iv_securityid.
+    TRY.
+        GET BADI lb_token_badi.
+      CATCH cx_root INTO lx_root.
+    ENDTRY.
+
+    IF lb_token_badi IS BOUND.
+      TRY.
+          CALL BADI lb_token_badi->fetch_token_from_ext_server
+            EXPORTING
+              digital_account = iv_dakey
+              app_id          = lv_appid
+              app_secret      = lv_securityid
+            CHANGING
+              access_token    = ev_token
+              expires_in      = ev_expires_in.
+        CATCH cx_ble_runtime_error INTO lx_ble_runtime_error.
+      ENDTRY.
+
+      IF lx_ble_runtime_error IS NOT INITIAL OR lx_root IS NOT INITIAL.
+        RAISE fetch_token_error.
+      ENDIF.
+    ENDIF.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method CL_CUAN_WECHAT_API=>GET_WECHAT_API_ERROR_DESC
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_ERROR_CODE                  TYPE        STRING
+* | [<-()] RV_ERROR_DESCRIPTION           TYPE        STRING
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_wechat_api_error_desc.
+*-----------------------------------------------------------------------
+* This method return the detail error information by error code
+*-----------------------------------------------------------------------
+
+    CLEAR rv_error_description.
+
+    CASE iv_error_code.
+      WHEN '40001'.
+        rv_error_description = gs_wechat_api_error_desc-ec40001.
+      WHEN '40002'.
+        rv_error_description = gs_wechat_api_error_desc-ec40002.
+      WHEN '40003'.
+        rv_error_description = gs_wechat_api_error_desc-ec40003.
+      WHEN '40013'.
+        rv_error_description = gs_wechat_api_error_desc-ec40013.
+      WHEN '40014'.
+        rv_error_description = gs_wechat_api_error_desc-ec40014.
+      WHEN '40030'.
+        rv_error_description = gs_wechat_api_error_desc-ec40030.
+      WHEN '40031'.
+        rv_error_description = gs_wechat_api_error_desc-ec40031.
+      WHEN '40125'.
+        rv_error_description = gs_wechat_api_error_desc-ec40125.
+      WHEN '45009'.
+        rv_error_description = gs_wechat_api_error_desc-ec45009.
+      WHEN '45065'.
+        rv_error_description = gs_wechat_api_error_desc-ec45065.
+      WHEN '48001'.
+        rv_error_description = gs_wechat_api_error_desc-ec48001.
+      WHEN '50001'.
+        rv_error_description = gs_wechat_api_error_desc-ec50001.
+      WHEN OTHERS.
+        rv_error_description = ' '.
+    ENDCASE.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_API->IF_CUAN_WECHAT_API~CALL_WECHAT_API
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        CUAN_WECHAT_DAKEY
+* | [--->] IV_API_ID                      TYPE        STRING
+* | [--->] IV_ADDITIONAL_GET_PARAMETER    TYPE        STRING(optional)
+* | [--->] IV_POST_PARAMETER              TYPE        STRING(optional)
+* | [<---] ET_DATA                        TYPE        CL_CUAN_WECHAT_UTILITY=>TT_JSON_ITABLE
+* | [<---] ET_MESSAGE                     TYPE        BAL_TT_MSG
+* | [<-->] CT_POST_DATA                   TYPE        TT_POST_DATA(optional)
+* | [EXC!] WECHAT_API_CALL_FAILED
+* | [EXC!] HTTP_CLIENT_CREATION_FAILED
+* | [EXC!] READ_ACCESS_TOKEN_FAILED
+* | [EXC!] HTTP_RESPONSE_PARSED_FAILED
+* | [EXC!] INVALID_HTTP_HEADERS
+* | [EXC!] INVALID_APP_ID
+* | [EXC!] INVALID_APP_SECRET
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+      METHOD if_cuan_wechat_api~call_wechat_api.
+* ------------------------------------------------------------
+* This method send http request by different API ID inputs
+* ------------------------------------------------------------
+
+
+        DATA: lo_http_client         TYPE REF TO if_http_client,
+              lo_http_client_2nd_try TYPE REF TO if_http_client.
+
+        DATA: lv_url       TYPE        string,
+              lv_response  TYPE        string,
+              lv_token     TYPE        cuan_da_token,
+              lv_token_new TYPE        cuan_da_token,
+              ls_error     TYPE cl_cuan_wechat_utility=>ty_json_itable.
+        DATA: ls_form_fields TYPE ihttpnvp,
+              lt_form_fields TYPE tihttpnvp.
+
+        DATA: lv_app_id_long     TYPE string,
+              lv_app_id          TYPE string,
+              lv_app_secret_long TYPE string,
+              lv_app_secret      TYPE string,
+              lv_dump            TYPE string. "Store extra field(s) when processing HTTP request parameters
+
+        DATA: lv_http_header     TYPE string.
+
+        DATA: lv_error_code TYPE string,
+              lv_error_desc TYPE string. "WeChat API error description
+
+        DATA: lv_message TYPE string,
+              ls_message TYPE bal_s_msg.
+
+        FIELD-SYMBOLS <fs_post_data> TYPE if_cuan_wechat_api=>ts_post_data.
+
+* ------------------------------------------------------------
+* Clear exporting parameters
+* ------------------------------------------------------------
+        CLEAR: et_data,
+               et_message,
+               lv_error_code.
+
+* ------------------------------------------------------------
+* Read token for the cases that access token is needed
+* ------------------------------------------------------------
+        IF iv_api_id <> if_cuan_wechat_api=>gs_wechat_api_id-connection_test.
+          CALL METHOD if_cuan_wechat_api~read_token
+            EXPORTING
+              iv_dakey                      = iv_dakey
+            IMPORTING
+              ev_token                      = lv_token
+            EXCEPTIONS
+              read_db_access_token_fail     = 1
+              read_wechat_access_token_fail = 2
+              OTHERS                        = 3.
+          IF sy-subrc <> 0.
+            MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4
+            RAISING read_access_token_failed.
+          ENDIF.
+
+          IF iv_additional_get_parameter IS NOT INITIAL.
+            CONCATENATE iv_additional_get_parameter '&access_token=' lv_token INTO lv_http_header.
+          ELSE.
+            CONCATENATE 'access_token=' lv_token INTO lv_http_header.
+          ENDIF.
+        ELSE.
+          lv_http_header = iv_additional_get_parameter.
+        ENDIF.
+
+* ------------------------------------------------------------
+* Create HTTP connection by API ID and header information
+* header information could be: appid, secret and openid
+* ------------------------------------------------------------
+        CALL METHOD if_cuan_wechat_api~create_http_connection
+          EXPORTING
+            iv_api_id                   = iv_api_id
+            iv_http_header              = lv_http_header
+          RECEIVING
+            eo_http_client              = lo_http_client
+          EXCEPTIONS
+            http_client_creation_failed = 1
+            invalid_init_api_id         = 2
+            invalid_http_headers        = 3
+            OTHERS                      = 4.
+        IF sy-subrc <> 0.
+          RAISE wechat_api_call_failed.
+        ENDIF.
+
+* ------------------------------------------------------------
+* Send HTTP request with body content
+* And convert response data
+* ------------------------------------------------------------
+        IF ct_post_data IS INITIAL.
+          CALL METHOD if_cuan_wechat_api~send_http_request
+            EXPORTING
+              io_http_client         = lo_http_client
+              iv_request_body        = iv_post_parameter
+            IMPORTING
+              ev_response            = lv_response
+            EXCEPTIONS
+              http_request_send_fail = 1.
+
+          IF sy-subrc <> 0.
+            RAISE wechat_api_call_failed.
+          ENDIF.
+
+          CALL METHOD cl_cuan_wechat_utility=>json_to_itable
+            EXPORTING
+              iv_json          = lv_response
+            IMPORTING
+              et_json_itable   = et_data
+            EXCEPTIONS
+              json_parse_error = 1
+              OTHERS           = 2.
+
+          IF sy-subrc <> 0.
+*            CLEAR lv_message.
+*            MESSAGE e064(cuan_wechat) WITH iv_api_id INTO lv_message. "Cannot parse JSON-format HTTP response returned by WeChat API ID &1.
+            RAISE wechat_api_call_failed.
+          ENDIF.
+
+          READ TABLE et_data INTO ls_error WITH KEY attribute = 'errcode'.
+          IF sy-subrc = 0 AND ls_error-value <> '0'.
+
+* ------------------------------------------------------------
+* Invalide access token error code (40001) handeling
+* ------------------------------------------------------------
+            IF ls_error-value = '40001'.
+* ------------------------------------------------------------
+* Refresh token by getting new access token from WeChat
+* ------------------------------------------------------------
+              me->fetch_token_from_wechat(
+                EXPORTING
+                  iv_dakey          = iv_dakey
+                IMPORTING
+                  ev_token          = lv_token_new
+                EXCEPTIONS
+                 fetch_token_fail = 1
+                 OTHERS = 2
+              ).
+
+              IF sy-subrc <> 0.
+                CLEAR lv_message.
+                MESSAGE e062(cuan_wechat). "Cannot get WeChat access token from WeChat Server.
+                RAISE read_access_token_failed.
+              ENDIF.
+
+* ------------------------------------------------------------
+* Reset token as the old token expired
+* ------------------------------------------------------------
+              REPLACE lv_token IN lv_http_header WITH lv_token_new.
+
+              CALL METHOD if_cuan_wechat_api~create_http_connection
+                EXPORTING
+                  iv_api_id                   = iv_api_id
+                  iv_http_header              = lv_http_header
+                RECEIVING
+                  eo_http_client              = lo_http_client_2nd_try
+                EXCEPTIONS
+                  http_client_creation_failed = 1
+                  invalid_init_api_id         = 2
+                  OTHERS                      = 3.
+
+              IF sy-subrc <> 0.
+                CLEAR lv_message.
+                MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO lv_message.
+                RAISE http_client_creation_failed.
+              ENDIF.
+
+* ------------------------------------------------------------
+* Send HTTP request again with refreshed access token
+* And convert response data
+* ------------------------------------------------------------
+              CALL METHOD if_cuan_wechat_api~send_http_request
+                EXPORTING
+                  io_http_client         = lo_http_client_2nd_try
+                  iv_request_body        = iv_post_parameter
+                IMPORTING
+                  ev_response            = lv_response
+                EXCEPTIONS
+                  http_request_send_fail = 1.
+
+              IF sy-subrc <> 0.
+                CLEAR lv_message.
+                MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO lv_message.
+                RAISE wechat_api_call_failed.
+              ENDIF.
+
+              CLEAR et_data.
+              CALL METHOD cl_cuan_wechat_utility=>json_to_itable
+                EXPORTING
+                  iv_json          = lv_response
+                IMPORTING
+                  et_json_itable   = et_data
+                EXCEPTIONS
+                  json_parse_error = 1
+                  OTHERS           = 2.
+
+              IF sy-subrc <> 0.
+                CLEAR lv_message.
+                MESSAGE e064(cuan_wechat) WITH iv_api_id INTO lv_message. "Cannot parse JSON-format HTTP response returned by WeChat API ID &1.
+                RAISE http_response_parsed_failed.
+              ENDIF.
+
+              lv_error_code = ls_error-value.
+              READ TABLE et_data INTO ls_error WITH KEY attribute = 'errcode'.
+
+              IF sy-subrc = 0 AND ls_error-value <> '0' .
+                CLEAR lv_message.
+                IF ls_error-value = '40001'.
+                  MESSAGE e046(cuan_wechat) WITH lv_error_code TEXT-001 TEXT-002 TEXT-003 INTO lv_message.
+                ELSE.
+                  lv_error_desc = get_wechat_api_error_desc( lv_error_code ).
+                  MESSAGE e000(cuan_wechat) WITH lv_error_code lv_error_desc INTO lv_message.
+                ENDIF.
+                RAISE wechat_api_call_failed.
+              ENDIF .
+
+            ELSE.
+              IF ls_error-value = '40013'.
+                RAISE invalid_app_id .
+              ELSEIF ls_error-value = '40125'.
+                RAISE invalid_app_secret .
+              ENDIF.
+              lv_error_code = ls_error-value.
+              READ TABLE et_data INTO ls_error WITH KEY attribute = 'errmsg'.
+              IF sy-subrc = 0.
+                "replace special charactor in wechat response
+                lv_error_desc = replace( val = ls_error-value regex = '[\[\]\{\}]'  with = space occ = 0 ).
+              ELSE.
+                lv_error_desc = get_wechat_api_error_desc( lv_error_code ).
+              ENDIF.
+              CLEAR lv_message.
+              MESSAGE e000(cuan_wechat) WITH lv_error_code lv_error_desc INTO lv_message.
+              RAISE wechat_api_call_failed.
+            ENDIF.
+
+          ENDIF.
+
+* ------------------------------------------------------------
+* Send HTTP request with mass body content
+* These WeChat Campaigns include:
+* WeChat - Automatic Campaign (Once) - Direct Message
+* And convert response data
+* ------------------------------------------------------------
+        ELSE.
+          CALL METHOD me->send_post_request_batch
+            EXPORTING
+              io_http_client    = lo_http_client
+            CHANGING
+              ct_post_data      = ct_post_data
+            EXCEPTIONS
+              http_request_fail = 1
+              invalid_token     = 2
+              OTHERS            = 3.
+
+          IF sy-subrc <> 0.
+            IF sy-subrc = 2.
+              me->fetch_token_from_wechat(
+                EXPORTING
+                  iv_dakey          = iv_dakey
+                IMPORTING
+                  ev_token          = lv_token_new
+                EXCEPTIONS
+                 fetch_token_fail = 1
+                 OTHERS = 2
+              ).
+
+              IF sy-subrc <> 0.
+                CLEAR lv_message.
+                MESSAGE e062(cuan_wechat) INTO lv_message. "Cannot get WeChat access token from WeChat Server.
+                RAISE read_access_token_failed.
+              ENDIF.
+
+* ------------------------------------------------------------
+* Reset token as the old token expired
+* ------------------------------------------------------------
+              REPLACE lv_token IN lv_http_header WITH lv_token_new.
+
+              CALL METHOD if_cuan_wechat_api~create_http_connection
+                EXPORTING
+                  iv_api_id                   = iv_api_id
+                  iv_http_header              = lv_http_header
+                RECEIVING
+                  eo_http_client              = lo_http_client_2nd_try
+                EXCEPTIONS
+                  http_client_creation_failed = 1
+                  invalid_init_api_id         = 2
+                  OTHERS                      = 3.
+
+              IF sy-subrc <> 0.
+                CLEAR lv_message.
+                MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO lv_message.
+                RAISE http_client_creation_failed.
+              ENDIF.
+
+              CALL METHOD me->send_post_request_batch
+                EXPORTING
+                  io_http_client    = lo_http_client_2nd_try
+                CHANGING
+                  ct_post_data      = ct_post_data
+                EXCEPTIONS
+                  http_request_fail = 1
+                  invalid_token     = 2
+                  OTHERS            = 3.
+
+              IF sy-subrc <> 0.
+                CLEAR lv_message.
+                IF sy-subrc = 2. " invalid token error with wechat error code 40001, should be displayed to end-user in campaign log
+                  lv_error_code = '40001'.
+                  MESSAGE e046(cuan_wechat) WITH lv_error_code TEXT-001 TEXT-002 TEXT-003 INTO lv_message.
+                ELSE.
+                  MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 INTO lv_message.
+                ENDIF.
+                RAISE wechat_api_call_failed.
+              ENDIF.
+            ELSE.
+              LOOP AT ct_post_data ASSIGNING <fs_post_data>.
+                IF <fs_post_data>-error_code <> 0.
+                  lv_error_code = <fs_post_data>-error_code.
+                ENDIF.
+              ENDLOOP.
+              lv_error_desc = get_wechat_api_error_desc( lv_error_code ).
+              CLEAR lv_message.
+              MESSAGE e000(cuan_wechat) WITH lv_error_code lv_error_desc INTO lv_message.
+              RAISE wechat_api_call_failed.
+            ENDIF.
+          ENDIF.
+        ENDIF.
+
+      ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_API->IF_CUAN_WECHAT_API~CREATE_HTTP_CONNECTION
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_API_ID                      TYPE        STRING
+* | [--->] IV_HTTP_HEADER                 TYPE        STRING(optional)
+* | [--->] IT_FORM_FIELDS                 TYPE        TIHTTPNVP(optional)
+* | [--->] IV_CDATA                       TYPE        STRING(optional)
+* | [--->] IV_REQUEST_URL                 TYPE        STRING(optional)
+* | [--->] IV_REQUEST_TYPE                TYPE        STRING(optional)
+* | [<---] ET_MESSAGE                     TYPE        BAL_TT_MSG
+* | [<-()] EO_HTTP_CLIENT                 TYPE REF TO IF_HTTP_CLIENT
+* | [EXC!] HTTP_CLIENT_CREATION_FAILED
+* | [EXC!] INVALID_INIT_API_ID
+* | [EXC!] INVALID_HTTP_HEADERS
+* | [EXC!] FAIL_TO_READ_CA
+* | [EXC!] CX_CUAN_DIGITAL_ACCOUNT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+      METHOD if_cuan_wechat_api~create_http_connection.
+*-------------------------------------------------------------------------------------------------
+* This method constracts HTTP client by API ID with header information
+* This method acts differently on On-Premise and Cloud Edition
+*-------------------------------------------------------------------------------------------------
+
+        CONSTANTS: lc_comm_scenario_id          TYPE if_saps_com_ca_rec_det=>ty_comm_scenario_id VALUE 'SAP_COM_0085',
+                   lc_recipient_business_system TYPE sld_bskey VALUE 'WECHAT_API'.
+
+        DATA: lo_api      TYPE REF TO if_saps_com_ca_rec_det,
+              lt_receiver TYPE if_saps_com_ca_rec_det=>tt_ca_receiver.
+
+        DATA: lo_http_client TYPE REF TO if_http_client,
+              ls_http_init   TYPE if_cuan_wechat_api=>ts_http_information_init.
+
+        DATA: lt_param_component      TYPE TABLE OF string,
+              lv_param_sub_component  TYPE string,
+              lv_param_sub_comp_name  TYPE string,
+              lv_param_sub_comp_value TYPE string.
+
+        DATA: ls_form_fields TYPE ihttpnvp,
+              lt_form_fields TYPE tihttpnvp,
+              wa_form_fields TYPE ihttpnvp.
+
+        DATA: lv_url_full TYPE string.
+
+        FIELD-SYMBOLS <fs_receiver> TYPE if_saps_com_ca_rec_det=>ty_ca_receiver.
+
+*-------------------------------------------------------------------------------------------------
+* Set API URL and outbound service ID for On-Premise and Cloud Edition
+* If reqeust URL is input, HTTP client will be directly constructed by URL
+*-------------------------------------------------------------------------------------------------
+        IF iv_request_url IS INITIAL.
+          CALL METHOD if_cuan_wechat_api~initialize_http_connection
+            EXPORTING
+              iv_api_id      = iv_api_id
+            IMPORTING
+              es_http_init   = ls_http_init
+            EXCEPTIONS
+              invalid_api_id = 1.
+
+        ELSE.
+          CALL METHOD cl_http_client=>create_by_url
+            EXPORTING
+              url                = iv_request_url
+              proxy_host         = gv_proxy_host
+              proxy_service      = gv_proxy_service
+              ssl_id             = ''
+              sap_username       = ''
+              sap_client         = ''
+            IMPORTING
+              client             = eo_http_client
+            EXCEPTIONS
+              argument_not_found = 1
+              plugin_not_active  = 2
+              internal_error     = 3
+              OTHERS             = 4.
+
+          IF sy-subrc <> 0.
+            MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING http_client_creation_failed.
+          ENDIF.
+
+*-------------------------------------------------------------------------------------------------
+* Set HTTP request type
+*-------------------------------------------------------------------------------------------------
+          eo_http_client->request->set_method( iv_request_type ).
+          RETURN.
+        ENDIF.
+
+*-------------------------------------------------------------------------------------------------
+* Instantiate http client for Cloud.
+* In cloud, WeChat host and outbound services are maintained via communciation arrangement, and
+* SM59 has been generated for the CA. HTTP client should be instantiated based on SM59 connection
+*-------------------------------------------------------------------------------------------------
+        IF cl_cuan_tc_tools=>is_s4hana_cloud_deployment( ).
+
+*-------------------------------------------------------------------------------------------------
+* Parse parameter into table form as HTTP header(s)
+*-------------------------------------------------------------------------------------------------
+          IF iv_http_header IS NOT INITIAL.
+            SPLIT iv_http_header AT '&' INTO TABLE lt_param_component.
+            LOOP AT lt_param_component INTO lv_param_sub_component.
+              SPLIT lv_param_sub_component AT '=' INTO lv_param_sub_comp_name lv_param_sub_comp_value.
+              CLEAR: ls_form_fields.
+              ls_form_fields-name = lv_param_sub_comp_name.
+              ls_form_fields-value = lv_param_sub_comp_value.
+              APPEND ls_form_fields TO lt_form_fields.
+            ENDLOOP.
+          ENDIF.
+
+*-------------------------------------------------------------------------------------------------
+* Check HTTP header(s)
+* If the first entry is initial, raise exception
+*-------------------------------------------------------------------------------------------------
+          READ TABLE lt_form_fields INTO wa_form_fields INDEX 1.
+          IF sy-subrc <> 0 OR wa_form_fields IS INITIAL.
+            "Invalid HTTP header(s) for WeChat API ID &1.
+            MESSAGE e063(cuan_wechat) WITH iv_api_id RAISING invalid_http_headers.
+          ENDIF.
+*-------------------------------------------------------------------------------------------------
+* Check Communication Arrangement
+*-------------------------------------------------------------------------------------------------
+*          TRY .
+*              CALL METHOD query_ca.
+*            CATCH cx_cuan_digital_account.
+*              RAISE fail_to_read_ca.
+*          ENDTRY.
+
+          lo_api = cl_saps_com_ca_rec_det=>get_instance( ).
+          lo_api->get_receiver_by_bus_system(
+            EXPORTING
+              iv_comm_scenario_id = lc_comm_scenario_id
+              iv_comm_service_id = ls_http_init-service_id
+            IMPORTING
+              et_receiver = lt_receiver
+            ).
+
+          READ TABLE lt_receiver ASSIGNING <fs_receiver> INDEX 1.
+          IF sy-subrc <> 0.
+            "Outbound service not found for service ID &1, communication scenario &2
+            MESSAGE e060(cuan_wechat) WITH ls_http_init-service_id lc_comm_scenario_id RAISING http_client_creation_failed.
+          ENDIF.
+
+          CALL METHOD cl_http_client=>create_by_destination
+            EXPORTING
+              destination              = <fs_receiver>-logical_port
+            IMPORTING
+              client                   = eo_http_client
+            EXCEPTIONS
+              argument_not_found       = 1
+              destination_not_found    = 2
+              destination_no_authority = 3
+              plugin_not_active        = 4
+              internal_error           = 5
+              OTHERS                   = 6.
+          IF sy-subrc <> 0.
+*            TODO EXCPETION CA_NOT_FOUND
+            MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING http_client_creation_failed.
+          ENDIF.
+
+*-------------------------------------------------------------------------------------------------
+* Set HTTP request headers
+*-------------------------------------------------------------------------------------------------
+          IF lt_form_fields IS NOT INITIAL.
+            eo_http_client->request->set_form_fields( lt_form_fields ).
+          ENDIF.
+        ELSE.
+
+*-------------------------------------------------------------------------------------------------
+* Instantiate http client for On-Premise.
+*-------------------------------------------------------------------------------------------------
+          CONCATENATE ls_http_init-url_prefix iv_http_header INTO lv_url_full.
+
+          CALL METHOD cl_http_client=>create_by_url
+            EXPORTING
+              url                = lv_url_full
+              proxy_host         = gv_proxy_host
+              proxy_service      = gv_proxy_service
+              ssl_id             = ''
+              sap_username       = ''
+              sap_client         = ''
+            IMPORTING
+              client             = eo_http_client
+            EXCEPTIONS
+              argument_not_found = 1
+              plugin_not_active  = 2
+              internal_error     = 3
+              OTHERS             = 4.
+
+          IF sy-subrc <> 0.
+            MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING http_client_creation_failed.
+          ENDIF.
+
+        ENDIF.
+
+*-------------------------------------------------------------------------------------------------
+* Set HTTP request type
+*-------------------------------------------------------------------------------------------------
+        eo_http_client->request->set_method( ls_http_init-request_type ).
+
+      ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method CL_CUAN_WECHAT_API=>IF_CUAN_WECHAT_API~INITIALIZE_HTTP_CONNECTION
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_API_ID                      TYPE        STRING
+* | [<---] ES_HTTP_INIT                   TYPE        TS_HTTP_INFORMATION_INIT
+* | [EXC!] INVALID_API_ID
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+      METHOD if_cuan_wechat_api~initialize_http_connection.
+* ---------------------------------------------------------------------------------------
+* This method constructs required information for HTTP request according to WeChat API ID
+* API URL prefix is set for On-Premise
+* HTTP request type is set only as GET or POST
+* Communication Scenario Outbound Service ID is set for Cloud Edition
+* ---------------------------------------------------------------------------------------
+
+
+* ------------------------------------------------------------
+* Read token for the cases that no access token needed
+* ------------------------------------------------------------
+        CLEAR es_http_init.
+
+* ------------------------------------------------------------
+* Set HTTP information
+* ------------------------------------------------------------
+        CASE iv_api_id.
+          WHEN if_cuan_wechat_api=>gs_wechat_api_id-get_access_token.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-get_token.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-get.
+            es_http_init-service_id = gs_wechat_api_service_id-get_token.
+          WHEN if_cuan_wechat_api=>gs_wechat_api_id-connection_test.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-get_token.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-get.
+            es_http_init-service_id = gs_wechat_api_service_id-get_token.
+          WHEN  if_cuan_wechat_api=>gs_wechat_api_id-get_user_list.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-get_user.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-get.
+            es_http_init-service_id = gs_wechat_api_service_id-get_user.
+          WHEN if_cuan_wechat_api=>gs_wechat_api_id-get_user_detail.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-get_user_info.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-get.
+            es_http_init-service_id = gs_wechat_api_service_id-get_user_info.
+          WHEN if_cuan_wechat_api=>gs_wechat_api_id-send_direct_message.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-send_custom_msg.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-post.
+            es_http_init-service_id = gs_wechat_api_service_id-send_custom_msg.
+          WHEN if_cuan_wechat_api=>gs_wechat_api_id-send_broadcast_message.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-send_mass_msg.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-post.
+            es_http_init-service_id = gs_wechat_api_service_id-send_mass_msg.
+          WHEN if_cuan_wechat_api=>gs_wechat_api_id-get_user_detail_batch.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-batch_get_user_info.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-post.
+            es_http_init-service_id = gs_wechat_api_service_id-batch_get_user_info.
+          WHEN if_cuan_wechat_api=>gs_wechat_api_id-sync_media_to_ymkt.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-batch_get_material.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-post.
+            es_http_init-service_id = gs_wechat_api_service_id-batch_get_material.
+          WHEN if_cuan_wechat_api=>gs_wechat_api_id-sync_coupon_to_ymkt_list.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-batch_get_card.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-post.
+            es_http_init-service_id = gs_wechat_api_service_id-batch_get_card.
+          WHEN if_cuan_wechat_api=>gs_wechat_api_id-sync_coupon_to_ymkt.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-get_card.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-post.
+            es_http_init-service_id = gs_wechat_api_service_id-get_card.
+          WHEN if_cuan_wechat_api=>gs_wechat_api_id-get_broadcast_report.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-get_article_summary.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-post.
+            es_http_init-service_id = gs_wechat_api_service_id-get_article_summary.
+          WHEN if_cuan_wechat_api=>gs_wechat_api_id-get_store_list.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-get_poi_list.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-post.
+            es_http_init-service_id = gs_wechat_api_service_id-get_poi_list.
+          WHEN if_cuan_wechat_api=>gs_wechat_api_id-get_shake_device.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-search_device.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-post.
+            es_http_init-service_id = gs_wechat_api_service_id-search_device.
+          WHEN if_cuan_wechat_api=>gs_wechat_api_id-sync_shake_page_to_ymkt.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-search_page.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-post.
+            es_http_init-service_id = gs_wechat_api_service_id-search_page.
+          WHEN if_cuan_wechat_api=>gs_wechat_api_id-get_store_list_old.
+            es_http_init-url_prefix = gs_wechat_api_url_prefix-get_poi_list_old.
+            es_http_init-request_type = if_cuan_wechat_api=>gs_http_request_type-post.
+            es_http_init-service_id = gs_wechat_api_service_id-get_poi_list_old.
+          WHEN OTHERS.
+
+        ENDCASE.
+      ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_API->IF_CUAN_WECHAT_API~READ_TOKEN
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        CUAN_WECHAT_DAKEY
+* | [<---] EV_TOKEN                       TYPE        CUAN_DA_TOKEN
+* | [<---] ET_MESSAGE                     TYPE        BAL_TT_MSG
+* | [EXC!] READ_DB_ACCESS_TOKEN_FAIL
+* | [EXC!] READ_WECHAT_ACCESS_TOKEN_FAIL
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+      METHOD if_cuan_wechat_api~read_token.
+* --------------------------------------------------------------------------------------
+* This method is a centralized place for getting WeChat access token
+* In normal case, WeChat access token is expired after 7200 seconds
+* Therefore this method:
+* 1) Check if the access token is expired
+* 2) Generate a new access token by APP ID and APP secret and cache it into secure store
+* if the old one is expired
+* --------------------------------------------------------------------------------------
+
+
+        DATA: lv_syts        TYPE timestampl,
+              lv_db_exp_time TYPE timestampl,
+              lv_db_token    TYPE cuan_da_token.
+
+        GET TIME STAMP FIELD lv_syts.
+
+* --------------------------------------------------------------------------------------
+* Get the cached access token
+* --------------------------------------------------------------------------------------
+        CALL METHOD me->fetch_token_from_db
+          EXPORTING
+            iv_dakey                = iv_dakey
+          IMPORTING
+            ev_expires_time         = lv_db_exp_time
+            ev_token                = lv_db_token
+          EXCEPTIONS
+            invalid_digital_account = 1
+            OTHERS                  = 2.
+        IF sy-subrc <> 0.
+          MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING read_db_access_token_fail.
+        ENDIF.
+
+* --------------------------------------------------------------------------------------
+* Validate the cached access token by comparing it with system time
+* --------------------------------------------------------------------------------------
+        IF lv_db_exp_time >= lv_syts.
+          ev_token = lv_db_token.
+
+* --------------------------------------------------------------------------------------
+* Generate a new access token from WeChat
+* --------------------------------------------------------------------------------------
+        ELSE.
+          CALL METHOD me->fetch_token_from_wechat
+            EXPORTING
+              iv_dakey         = iv_dakey
+            IMPORTING
+              ev_token         = ev_token
+            EXCEPTIONS
+              fetch_token_fail = 1
+              OTHERS           = 2.
+          IF sy-subrc <> 0.
+            MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING read_wechat_access_token_fail.
+          ENDIF.
+        ENDIF.
+
+      ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_API->IF_CUAN_WECHAT_API~SEND_HTTP_REQUEST
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_REQUEST_BODY                TYPE        STRING(optional)
+* | [--->] IO_HTTP_CLIENT                 TYPE REF TO IF_HTTP_CLIENT(optional)
+* | [--->] IV_REQUEST_URL                 TYPE        STRING(optional)
+* | [<---] EV_RESPONSE                    TYPE        STRING
+* | [<---] EV_XRESPONSE                   TYPE        XSTRING
+* | [EXC!] HTTP_REQUEST_SEND_FAIL
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+      METHOD if_cuan_wechat_api~send_http_request.
+* ------------------------------------------------------------
+* In this method, HTTP request will be sent by
+* HTTP client input and request body input
+* ------------------------------------------------------------
+
+        DATA:
+          lo_wechat_http_request_client TYPE REF TO if_http_client,
+          lv_status                     TYPE        i,
+          lv_sysubrc                    TYPE        sysubrc,
+          lv_status_msg                 TYPE        string,
+          lv_error_msg                  TYPE        string.
+
+        lo_wechat_http_request_client = io_http_client.
+
+* ------------------------------------------------------------
+* Set HTTP request body
+* ------------------------------------------------------------
+        IF iv_request_body IS NOT INITIAL.
+          lo_wechat_http_request_client->request->set_cdata( iv_request_body ).
+        ENDIF.
+
+* ------------------------------------------------------------
+* Send HTTP request
+* ------------------------------------------------------------
+        CALL METHOD lo_wechat_http_request_client->send
+          EXCEPTIONS
+            http_communication_failure = 1
+            http_invalid_state         = 2
+            http_processing_failed     = 3.
+
+        IF sy-subrc <> 0.
+          CALL METHOD lo_wechat_http_request_client->get_last_error
+            IMPORTING
+              code    = lv_sysubrc
+              message = lv_error_msg.
+
+          lo_wechat_http_request_client->close( ).
+          RAISE http_request_send_fail.
+        ENDIF.
+
+* ------------------------------------------------------------
+* Get HTTP response
+* ------------------------------------------------------------
+        CALL METHOD lo_wechat_http_request_client->receive
+          EXCEPTIONS
+            http_communication_failure = 1
+            http_invalid_state         = 2
+            http_processing_failed     = 3.
+
+        IF sy-subrc <> 0.
+          CALL METHOD lo_wechat_http_request_client->get_last_error
+            IMPORTING
+              code    = lv_sysubrc
+              message = lv_error_msg.
+
+          lo_wechat_http_request_client->close( ).
+          sy-msgv1 = lv_error_msg.
+          MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING http_request_send_fail.
+        ENDIF.
+
+* ------------------------------------------------------------
+* Check HTTP response
+* HTTP status code might be:
+* 200: OK
+* 400: Bad Request
+* 403: Forbidden
+* 404: Not Found
+* 500: Internal Server Error
+* 502: Bad Gateway
+* 503 Service Unavailable
+* ------------------------------------------------------------
+        CALL METHOD lo_wechat_http_request_client->response->get_status
+          IMPORTING
+            code   = lv_status
+            reason = lv_status_msg.
+
+        IF lv_status <> '200'.
+          lo_wechat_http_request_client->close( ).
+          RAISE http_request_send_fail.
+        ENDIF.
+
+* ------------------------------------------------------------
+* Get Response
+* ------------------------------------------------------------
+        ev_response = lo_wechat_http_request_client->response->get_cdata( ).
+        ev_xresponse = lo_wechat_http_request_client->response->get_data( ).
+
+* ------------------------------------------------------------
+* Close HTTP Connection
+* ------------------------------------------------------------
+        lo_wechat_http_request_client->close( ).
+
+      ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method CL_CUAN_WECHAT_API=>IS_TOKEN_BADI_IMPLEMENTED
+* +-------------------------------------------------------------------------------------------------+
+* | [<-()] RV_RESULT                      TYPE        ABAP_BOOL
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+      METHOD is_token_badi_implemented.
+        DATA: lb_token_badi  TYPE  REF TO cuan_da_get_access_token.
+        TRY.
+            GET BADI lb_token_badi.
+          CATCH cx_root.
+        ENDTRY.
+        IF lb_token_badi IS BOUND.
+          rv_result = abap_true.
+        ENDIF.
+      ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method CL_CUAN_WECHAT_API->SEND_POST_REQUEST_BATCH
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IO_HTTP_CLIENT                 TYPE REF TO IF_HTTP_CLIENT
+* | [<-->] CT_POST_DATA                   TYPE        IF_CUAN_WECHAT_API=>TT_POST_DATA
+* | [EXC!] HTTP_REQUEST_FAIL
+* | [EXC!] INVALID_TOKEN
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+      METHOD send_post_request_batch.
+*-------------------------------------------------------------------------------------
+* This method send HTTP request by:
+* 1) HTTP client input
+* 2) HTTP request body data input
+*-------------------------------------------------------------------------------------
+
+
+        DATA:
+          lo_wechat_http_request_client TYPE REF TO if_http_client,
+          ls_post_data                  TYPE if_cuan_wechat_api=>ts_post_data,
+          ls_node                       TYPE cl_cuan_wechat_utility=>ty_json_itable,
+          lt_node                       TYPE cl_cuan_wechat_utility=>tt_json_itable.
+
+        lo_wechat_http_request_client = io_http_client.
+
+*-------------------------------------------------------------------------------------
+* Set HTTP request type: POST
+*-------------------------------------------------------------------------------------
+        CALL METHOD lo_wechat_http_request_client->request->set_method( if_cuan_wechat_api=>gs_http_request_type-post ).
+
+        LOOP AT ct_post_data INTO ls_post_data.
+          IF ls_post_data-error_code IS NOT INITIAL.
+            CONTINUE.
+          ENDIF.
+*-------------------------------------------------------------------------------------
+* Set HTTP request body
+*-------------------------------------------------------------------------------------
+          lo_wechat_http_request_client->request->set_cdata( ls_post_data-post_parameter ).
+
+*-------------------------------------------------------------------------------------
+* Send HTTP request
+*-------------------------------------------------------------------------------------
+          CALL METHOD lo_wechat_http_request_client->send
+            EXCEPTIONS
+              http_communication_failure = 1
+              http_invalid_state         = 2
+              http_processing_failed     = 3.
+          IF sy-subrc <> 0.
+            ls_post_data-status_msg = 'SEND METHOD EXCEPTION'.
+          ENDIF.
+
+*-------------------------------------------------------------------------------------
+* Receive HTTP response
+*-------------------------------------------------------------------------------------
+          IF ls_post_data-status_msg IS INITIAL.
+            CALL METHOD lo_wechat_http_request_client->receive
+              EXCEPTIONS
+                http_communication_failure = 1
+                http_invalid_state         = 2
+                http_processing_failed     = 3.
+            IF sy-subrc <> 0.
+              ls_post_data-status_msg = 'RECEIVE METHOD EXCEPTION'.
+            ENDIF.
+          ENDIF.
+
+          IF ls_post_data-status_msg IS INITIAL.
+            CALL METHOD lo_wechat_http_request_client->response->get_status
+              IMPORTING
+                code   = ls_post_data-status
+                reason = ls_post_data-status_msg.
+          ENDIF.
+
+          "Get response.
+          CLEAR:lt_node.
+          ls_post_data-response = lo_wechat_http_request_client->response->get_cdata( ).
+          CALL METHOD cl_cuan_wechat_utility=>json_to_itable
+            EXPORTING
+              iv_json          = ls_post_data-response
+            IMPORTING
+              et_json_itable   = lt_node
+            EXCEPTIONS
+              json_parse_error = 1
+              OTHERS           = 2.
+
+          READ TABLE lt_node INTO ls_node WITH KEY attribute = 'errcode'.
+          IF sy-subrc = 0.
+            IF ls_node-value = '40001'.
+              RAISE invalid_token.
+            ENDIF.
+            ls_post_data-error_code = ls_node-value.
+          ENDIF.
+
+          MODIFY ct_post_data FROM ls_post_data.
+
+        ENDLOOP.
+
+*-------------------------------------------------------------------------------------
+* Close HTTP connection
+*-------------------------------------------------------------------------------------
+        lo_wechat_http_request_client->close( ).
+      ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method CL_CUAN_WECHAT_API->UPDATE_TOKEN_TO_DB
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_DAKEY                       TYPE        CUAN_WECHAT_DAKEY
+* | [--->] IV_EXPIRE_TSTMP                TYPE        TIMESTAMPL
+* | [--->] IV_TOKEN_SEC_ID                TYPE        GUID_32
+* | [--->] IV_TOKEN                       TYPE        CUAN_DA_TOKEN
+* | [--->] IV_VERSION                     TYPE        CHAR1(optional)
+* | [EXC!] WECHAT_API_ERROR
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+      METHOD update_token_to_db.
+        DATA lv_token_sec_id      TYPE guid_32.
+        DATA lv_token_sec_string  TYPE string.
+        DATA lv_exp_time_string   TYPE string.
+
+        DATA: ls_modification     TYPE /bobf/s_frw_modification.
+        DATA: lt_modification     TYPE /bobf/t_frw_modification.
+
+        DATA(lo_transaction_mgr) = /bobf/cl_tra_trans_mgr_factory=>get_transaction_manager( ).
+        DATA(lo_service_mgr)    = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_digital_account_c=>sc_bo_key ).
+
+        DATA:ls_ext_da_attr TYPE REF TO cuan_s_ext_to_da.
+        DATA lv_dir TYPE string.
+        DATA lv_method TYPE string.
+
+        IF iv_version = 'X'.
+          lv_dir = space.
+        ELSE.
+          lv_dir = cl_cuan_digacc_prov=>gc_prefix_subout.
+        ENDIF.
+        lv_exp_time_string = iv_expire_tstmp.
+        CONCATENATE lv_exp_time_string ';' iv_token INTO lv_token_sec_string.
+
+        IF iv_token_sec_id IS INITIAL.
+
+          lv_token_sec_id = /bobf/cl_frw_factory=>get_new_key( ).
+          TRY .
+              CALL METHOD cl_cuan_digacc_prov=>sec_modify_api
+                EXPORTING
+                  iv_id       = lv_token_sec_id
+                  iv_dasecret = lv_token_sec_string
+                  iv_dir      = lv_dir "space"cl_cuan_digacc_prov=>gc_prefix_subout
+                  iv_method   = 'INSERT'.
+              COMMIT WORK AND WAIT.
+            CATCH cx_cuan_digital_account.
+              MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                         WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING wechat_api_error.
+          ENDTRY.
+********************************************************************************************
+* save wechat access token as extended attribute
+          CREATE DATA ls_ext_da_attr.
+          ls_ext_da_attr->key                  =   /bobf/cl_frw_factory=>get_new_key( ).
+          ls_ext_da_attr->digital_account_key  = iv_dakey.
+          ls_ext_da_attr->parent_key           = iv_dakey.
+          ls_ext_da_attr->attribute_name       = 'ACCESS_TOKEN'.
+          ls_ext_da_attr->attribute_secure_ref = lv_token_sec_id.
+
+          ls_modification-data        =   ls_ext_da_attr.
+          ls_modification-change_mode =   /bobf/if_frw_c=>sc_modify_create.
+          ls_modification-node        =   if_cuan_digital_account_c=>sc_node-extended.
+          ls_modification-key         =   ls_ext_da_attr->key.
+          ls_modification-association = if_cuan_digital_account_c=>sc_association-extended-to_root.
+          ls_modification-source_node = if_cuan_digital_account_c=>sc_node-root.
+          ls_modification-source_key  = iv_dakey.
+          APPEND ls_modification TO lt_modification.
+*create extended attribute by BO
+
+          lo_service_mgr->modify(
+              EXPORTING it_modification = lt_modification
+              IMPORTING eo_change = DATA(lo_change_c)
+                        eo_message = DATA(lo_message_c) ).
+
+          lo_transaction_mgr->save( IMPORTING ev_rejected = DATA(lv_save_rejected)
+                                    eo_message = lo_message_c ).
+
+        ELSE.
+          lv_token_sec_id = iv_token_sec_id.
+
+          TRY.
+              CALL METHOD cl_cuan_digacc_prov=>sec_read_api
+                EXPORTING
+                  iv_id   = lv_token_sec_id
+                IMPORTING
+                  ev_data = DATA(lv_data)
+                  ev_size = DATA(lv_size).
+            CATCH cx_cuan_digital_account .
+          ENDTRY.
+          IF lv_data IS INITIAL.
+            lv_method = 'INSERT'.
+          ELSE.
+            lv_method = 'UPDATE'.
+          ENDIF.
+          TRY .
+              CALL METHOD cl_cuan_digacc_prov=>sec_modify_api
+                EXPORTING
+                  iv_id       = lv_token_sec_id
+                  iv_dasecret = lv_token_sec_string
+                  iv_dir      = lv_dir "space"cl_cuan_digacc_prov=>gc_prefix_subout
+                  iv_method   = lv_method.
+              COMMIT WORK AND WAIT.
+            CATCH cx_cuan_digital_account.
+              MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                         WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4 RAISING wechat_api_error.
+          ENDTRY.
+        ENDIF.
+      ENDMETHOD.
+ENDCLASS.

@@ -1,0 +1,18 @@
+***
+*Rule to name a sub-class : CL_CUAN_NTWRK_INBOUND_<Communication Medium Name>
+***
+  METHOD get_implementation_class.
+
+    CONSTANTS: lc_prefix TYPE string VALUE 'CL_CUAN_NTWRK_INBOUND_'.
+    DATA: lv_class_name TYPE string,
+          lv_message    TYPE string,
+          ls_message    TYPE bal_s_msg,
+          lr_exc        TYPE REF TO cx_root.
+
+    CONCATENATE lc_prefix iv_comm_medium INTO lv_class_name.
+    TRY.
+        CREATE OBJECT ro_message_processor TYPE (lv_class_name).
+      CATCH cx_root.
+    ENDTRY.
+
+  ENDMETHOD.

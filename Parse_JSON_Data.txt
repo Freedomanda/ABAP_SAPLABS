@@ -1,0 +1,212 @@
+public section.
+
+  types:
+    BEGIN OF ty_parsed_data ,
+        index     TYPE string,
+        attribute TYPE string,
+        value     TYPE string,
+      END OF ty_parsed_data .
+  types:
+    tt_parsed_data TYPE TABLE OF ty_parsed_data .
+
+  constants:
+    BEGIN OF gc_log_name,
+        log_object    TYPE bal_s_log-object VALUE 'CUAN',
+        log_subobject TYPE bal_s_log-subobject VALUE 'CUAN_NTWRK',
+      END OF gc_log_name .
+  constants:
+    BEGIN OF con_probclass_priority,
+        very_high TYPE bal_s_msg-probclass VALUE '1',
+        high      TYPE bal_s_msg-probclass VALUE '2',
+        medium    TYPE bal_s_msg-probclass VALUE '3',
+        low       TYPE bal_s_msg-probclass VALUE '4',
+      END OF con_probclass_priority .
+  constants:
+    BEGIN OF gc_json_attributes ,
+        attribute     TYPE string VALUE 'attribute' ##NO_TEXT,
+        open_element  TYPE string VALUE 'open_element' ##NO_TEXT,
+        close_element TYPE string VALUE 'close_element' ##NO_TEXT,
+        value         TYPE string VALUE 'value' ##NO_TEXT,
+        error         TYPE string VALUE 'Error' ##NO_TEXT,
+      END OF gc_json_attributes .
+
+IV_JSON	TYPE STRING
+ET_PARSED_DATA	TYPE TT_PARSED_DATA
+EV_NODE_NUMBER	TYPE I
+
+
+
+  METHOD parse_json_data.
+    DATA: BEGIN OF ls_level_tab,
+            level     TYPE string,
+            indicator TYPE string,
+          END OF ls_level_tab .
+
+    DATA: BEGIN OF ls_raw_node,
+            node_type TYPE string,
+            prefix    TYPE string,
+            name      TYPE string,
+            nsuri     TYPE string,
+            value     TYPE string,
+            value_raw TYPE xstring,
+          END OF ls_raw_node .
+
+    FIELD-SYMBOLS <fs_level_tab> LIKE ls_level_tab.
+
+    DATA: lt_level_tab         LIKE STANDARD TABLE OF ls_level_tab WITH KEY level,
+          lt_raw_node          LIKE TABLE OF ls_raw_node,
+          lv_level_counter     TYPE i VALUE 0,
+          lv_attribute_name    TYPE string,
+          lv_seperator         TYPE char1,
+          ls_json_itable       TYPE ty_parsed_data,
+          lv_node_counter      TYPE i VALUE 1,
+          lv_node_flag_counter TYPE i,
+          lv_index             TYPE i,
+          lv_temp_counter      TYPE i.
+
+    DATA(json) = cl_abap_codepage=>convert_to( iv_json ).
+    DATA(reader) = cl_sxml_string_reader=>create( json ).
+
+    TRY.
+        DO.
+          CLEAR ls_raw_node.
+          DATA(node) = reader->read_next_node( ).
+          IF node IS INITIAL.
+            EXIT.
+          ENDIF.
+          CASE node->type.
+            WHEN if_sxml_node=>co_nt_element_open.
+              DATA(open_element)    = CAST if_sxml_open_element( node ).
+              ls_raw_node-node_type = gc_json_attributes-open_element.
+              ls_raw_node-prefix    = open_element->prefix.
+              ls_raw_node-name      = open_element->qname-name.
+              ls_raw_node-nsuri     = open_element->qname-namespace.
+              DATA(attributes)  = open_element->get_attributes( ).
+              APPEND ls_raw_node TO lt_raw_node.
+
+              LOOP AT attributes INTO DATA(attribute).
+                ls_raw_node-node_type = gc_json_attributes-attribute.
+                ls_raw_node-prefix    = attribute->prefix.
+                ls_raw_node-name      = attribute->qname-name.
+                ls_raw_node-nsuri     = attribute->qname-namespace.
+                IF attribute->value_type = if_sxml_value=>co_vt_text.
+                  ls_raw_node-value = attribute->get_value( ).
+                ENDIF.
+                APPEND ls_raw_node TO lt_raw_node.
+              ENDLOOP.
+              CONTINUE.
+            WHEN if_sxml_node=>co_nt_element_close.
+              DATA(close_element)     = CAST if_sxml_close_element( node ).
+              ls_raw_node-node_type   = gc_json_attributes-close_element.
+              ls_raw_node-prefix      = close_element->prefix.
+              ls_raw_node-name        = close_element->qname-name.
+              ls_raw_node-nsuri       = close_element->qname-namespace.
+              APPEND ls_raw_node TO lt_raw_node.
+              CONTINUE.
+            WHEN if_sxml_node=>co_nt_value.
+              DATA(value_node)          = CAST if_sxml_value_node( node ).
+              ls_raw_node-node_type     = gc_json_attributes-value.
+              IF value_node->value_type = if_sxml_value=>co_vt_text.
+                ls_raw_node-value = value_node->get_value( ).
+              ENDIF.
+              APPEND ls_raw_node TO lt_raw_node.
+              CONTINUE.
+            WHEN OTHERS.
+              ls_raw_node-node_type   = gc_json_attributes-error.
+              APPEND ls_raw_node TO lt_raw_node.
+              EXIT.
+          ENDCASE.
+        ENDDO.
+      CATCH cx_sxml_parse_error INTO DATA(parse_error).
+
+    ENDTRY.
+
+*-------------------------------------------------------------------------
+*
+* row table to sorted table
+*
+*-------------------------------------------------------------------------
+
+    LOOP AT lt_raw_node INTO ls_raw_node.
+*Check if open element, if yes increase level counter
+      IF  ls_raw_node-node_type = gc_json_attributes-open_element.
+        lv_level_counter = lv_level_counter + 1.
+
+*Check if it is new node, if yes increase node counter
+        IF lv_node_flag_counter IS NOT INITIAL AND lv_level_counter = lv_node_flag_counter.
+          lv_node_counter = lv_node_counter + 1.
+        ENDIF.
+
+*Add level indicator to level table in order to remember which level we are in
+        CLEAR ls_level_tab.
+        READ TABLE lt_level_tab INTO ls_level_tab WITH TABLE KEY level = lv_level_counter.
+        IF ls_level_tab IS INITIAL.
+          ls_level_tab-level = lv_level_counter.
+          APPEND ls_level_tab TO lt_level_tab.
+        ENDIF.
+      ENDIF.
+
+*Check if attribute
+      IF  ls_raw_node-node_type = gc_json_attributes-attribute.
+*If no entry in our generated result table then me mark current level as the begining of each node
+        IF et_parsed_data IS INITIAL.
+          lv_node_flag_counter = lv_level_counter - 1.
+        ENDIF.
+
+        LOOP AT lt_level_tab ASSIGNING <fs_level_tab> WHERE level = lv_level_counter.
+          <fs_level_tab>-indicator =  ls_raw_node-value.
+        ENDLOOP.
+      ENDIF.
+
+*Check if value
+*-------------------------------------------------------------------------
+*Add level indicator to level table in order to show hierachy node
+*For instance if we have following node hieracy
+*   -A
+*     -a
+*     -b
+*we wil have following naming convertion in our generated table
+*  A-a  &  A-b
+*-------------------------------------------------------------------------
+      IF  ls_raw_node-node_type = gc_json_attributes-value.
+        CLEAR lv_attribute_name.
+        LOOP AT lt_level_tab ASSIGNING <fs_level_tab> FROM 0 TO lv_level_counter.
+          IF <fs_level_tab>-indicator IS NOT INITIAL.
+            CONCATENATE lv_attribute_name '-' <fs_level_tab>-indicator INTO lv_attribute_name.
+          ENDIF.
+        ENDLOOP.
+
+        CLEAR: lv_seperator, lv_index.
+        IF lv_attribute_name IS NOT INITIAL.
+          lv_seperator = lv_attribute_name+0(1).
+        ENDIF.
+
+        IF lv_seperator = '-'.
+          lv_index          = strlen( lv_attribute_name ) - 1.
+          lv_attribute_name = lv_attribute_name+1(lv_index).
+        ENDIF.
+
+        IF lv_attribute_name IS NOT INITIAL.
+          ls_json_itable-attribute = lv_attribute_name.
+          ls_json_itable-value     = ls_raw_node-value.
+          ls_json_itable-index     = lv_node_counter.
+          APPEND ls_json_itable TO et_parsed_data.
+        ENDIF.
+        CLEAR: ls_json_itable.
+      ENDIF.
+
+*Check if close element
+      IF  ls_raw_node-node_type = gc_json_attributes-close_element.
+        lv_level_counter = lv_level_counter - 1.
+
+*Remove level indicator from level table
+        DESCRIBE TABLE lt_level_tab LINES lv_temp_counter.
+        LOOP AT lt_level_tab ASSIGNING <fs_level_tab> FROM lv_level_counter + 1 TO lv_temp_counter.
+          <fs_level_tab>-indicator = ''.
+        ENDLOOP.
+      ENDIF.
+    ENDLOOP.
+
+*Return total number of nodes
+    ev_node_number = lv_node_counter.
+  ENDMETHOD.

@@ -1,0 +1,340 @@
+CLASS cl_cuan_wechat_log DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PRIVATE .
+
+  PUBLIC SECTION.
+
+* problem class
+    CONSTANTS con_log_object TYPE bal_s_log-object VALUE 'CUAN' ##NO_TEXT.
+    CONSTANTS con_log_subobject TYPE bal_s_log-subobject VALUE 'CUAN_WECHAT' ##NO_TEXT.
+* problem class
+    CONSTANTS con_probclass_very_high TYPE bal_s_msg-probclass VALUE '1' ##NO_TEXT.
+    CONSTANTS con_probclass_high TYPE bal_s_msg-probclass VALUE '2' ##NO_TEXT.
+    CONSTANTS con_probclass_medium TYPE bal_s_msg-probclass VALUE '3' ##NO_TEXT.
+    CONSTANTS con_probclass_low TYPE bal_s_msg-probclass VALUE '4' ##NO_TEXT.
+    CONSTANTS con_probclass_none TYPE bal_s_msg-probclass VALUE ' ' ##NO_TEXT.
+    CONSTANTS:
+      BEGIN OF sc_job_name,
+        wch_inbound TYPE programm VALUE 'CUAN_WECHAT_MESSAGE_HANDLE',
+        wch_sync_user TYPE programm VALUE 'CUAN_WECHAT_USER_SYNC',
+        wch_sync_sto_dev TYPE programm VALUE 'CUAN_WECHAT_STORE_DEVICE_SYNC',
+        wch_sync_content TYPE programm VALUE 'CUAN_WECHAT_CONTENT_SYNC',
+      END OF sc_job_name .
+    CONSTANTS:
+      BEGIN OF sc_job_title,
+        wch_inbound      TYPE bal_s_log-extnumber VALUE 'WeChat Inbound Message Application Log' ##NO_TEXT,
+        wch_sync_content TYPE bal_s_log-extnumber VALUE 'Log for Content Synchronization from WeChat' ##NO_TEXT,
+        wch_sync_user TYPE bal_s_log-extnumber VALUE 'Log for User Synchronization from WeChat' ##NO_TEXT,
+        wch_sync_loc_dev TYPE bal_s_log-extnumber VALUE 'Log for Location&Beacon Synchronization from WeChat' ##NO_TEXT,
+      END OF sc_job_title .
+
+    CLASS-METHODS get_instance
+      IMPORTING
+        !iv_extnumber TYPE bal_s_log-extnumber OPTIONAL
+        !iv_object    TYPE bal_s_log-object
+        !iv_subobject TYPE bal_s_log-subobject
+      RETURNING
+        VALUE(eo_log) TYPE REF TO cl_cuan_wechat_log .
+    METHODS msg_add
+      IMPORTING
+        !iv_probclass TYPE bal_s_msg-probclass .
+    METHODS msges_add
+      IMPORTING
+        !it_message TYPE bapiret2_t .
+    METHODS save .
+    METHODS read
+      IMPORTING
+        !i_read_texts  TYPE boolean DEFAULT space
+        !i_langu       TYPE sylangu DEFAULT sy-langu
+      EXPORTING
+        !es_log        TYPE bal_s_log
+        !es_statistics TYPE bal_s_scnt
+        !et_msg        TYPE bal_t_msgr
+        !et_exc        TYPE bal_t_excr_mass
+      EXCEPTIONS
+        log_not_found .
+    METHODS delete
+      EXCEPTIONS
+        log_not_found .
+    METHODS display .
+    METHODS msg_add_with_extended_longtext
+      IMPORTING
+        !it_data_tab  TYPE srt_xml_data_tab
+        !iv_probclass TYPE bal_s_msg-probclass .
+PROTECTED SECTION.
+PRIVATE SECTION.
+    DATA gv_log_handle TYPE balloghndl.
+
+    METHODS constructor
+        IMPORTING !iv_extnumber type bal_s_log-extnumber optional
+                  iv_object    TYPE bal_s_log-object
+                  iv_subobject TYPE bal_s_log-subobject.
+ENDCLASS.
+
+
+
+CLASS CL_CUAN_WECHAT_LOG IMPLEMENTATION.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Private Method CL_CUAN_WECHAT_LOG->CONSTRUCTOR
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_EXTNUMBER                   TYPE        BAL_S_LOG-EXTNUMBER(optional)
+* | [--->] IV_OBJECT                      TYPE        BAL_S_LOG-OBJECT
+* | [--->] IV_SUBOBJECT                   TYPE        BAL_S_LOG-SUBOBJECT
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD constructor.
+
+    DATA: ls_log TYPE bal_s_log.
+
+    ls_log-extnumber = iv_extnumber.
+    ls_log-object    = iv_object. " 'CUAN_IMPORT'.
+    ls_log-subobject = iv_subobject. " 'CUAN_ACTUAL_IMPORT'.
+
+* create an initial log file
+    CALL FUNCTION 'BAL_LOG_CREATE'
+         EXPORTING
+              i_s_log      = ls_log
+         IMPORTING
+              e_log_handle = gv_log_handle
+         EXCEPTIONS
+              OTHERS       = 1.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_LOG->DELETE
+* +-------------------------------------------------------------------------------------------------+
+* | [EXC!] LOG_NOT_FOUND
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD delete.
+    CALL FUNCTION 'BAL_LOG_DELETE'
+        EXPORTING i_log_handle = gv_log_handle
+        EXCEPTIONS
+          log_not_found.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_LOG->DISPLAY
+* +-------------------------------------------------------------------------------------------------+
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD display.
+
+    DATA: lt_logh TYPE bal_t_logh.
+
+    APPEND gv_log_handle TO lt_logh.
+
+    CALL FUNCTION 'BAL_DSP_LOG_DISPLAY'
+      EXPORTING
+        i_t_log_handle       = lt_logh
+      EXCEPTIONS
+        profile_inconsistent = 1
+        internal_error       = 2
+        no_data_available    = 3
+        no_authority         = 4
+        OTHERS               = 5
+      .
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Static Public Method CL_CUAN_WECHAT_LOG=>GET_INSTANCE
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_EXTNUMBER                   TYPE        BAL_S_LOG-EXTNUMBER(optional)
+* | [--->] IV_OBJECT                      TYPE        BAL_S_LOG-OBJECT
+* | [--->] IV_SUBOBJECT                   TYPE        BAL_S_LOG-SUBOBJECT
+* | [<-()] EO_LOG                         TYPE REF TO CL_CUAN_WECHAT_LOG
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD get_instance.
+
+    DATA: lo_log TYPE REF TO cl_cuan_wechat_log.
+
+    CREATE OBJECT lo_log
+        EXPORTING iv_extnumber = iv_extnumber
+                  iv_object    = iv_object
+                  iv_subobject = iv_subobject.
+
+    eo_log = lo_log.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_LOG->MSGES_ADD
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IT_MESSAGE                     TYPE        BAPIRET2_T
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD msges_add.
+
+    DATA: lr_message TYPE REF TO bapiret2,
+          ls_msg     TYPE bal_s_msg.
+
+    LOOP AT it_message REFERENCE INTO lr_message where type = 'E'.
+      CLEAR: ls_msg.
+      ls_msg-msgid = lr_message->id.
+      ls_msg-msgno = lr_message->number.
+      ls_msg-msgty = lr_message->type.
+      ls_msg-msgv1 = lr_message->message_v1.
+      ls_msg-msgv2 = lr_message->message_v2.
+      ls_msg-msgv3 = lr_message->message_v3.
+      ls_msg-msgv4 = lr_message->message_v4.
+      ls_msg-probclass = con_probclass_very_high.
+      CALL FUNCTION 'BAL_LOG_MSG_ADD'
+         EXPORTING
+              i_s_msg       = ls_msg
+              i_log_handle  = gv_log_handle
+         EXCEPTIONS
+              log_not_found = 0
+              OTHERS        = 1.
+    ENDLOOP.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_LOG->MSG_ADD
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IV_PROBCLASS                   TYPE        BAL_S_MSG-PROBCLASS
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD msg_add.
+    DATA:
+      ls_msg TYPE bal_s_msg.
+
+*   define data of message for Application Log
+    ls_msg-msgty     = sy-msgty.
+    ls_msg-msgid     = sy-msgid.
+    ls_msg-msgno     = sy-msgno.
+    ls_msg-msgv1     = sy-msgv1.
+    ls_msg-msgv2     = sy-msgv2.
+    ls_msg-msgv3     = sy-msgv3.
+    ls_msg-msgv4     = sy-msgv4.
+    ls_msg-probclass = iv_probclass.
+
+*   add this message to log file
+*   we do not specify I_LOG_HANDLE since we want to add this message
+*   to the default log. If it does not exist we do not care
+*   (EXCEPTIONS log_not_found = 0).
+    CALL FUNCTION 'BAL_LOG_MSG_ADD'
+         EXPORTING
+              i_s_msg       = ls_msg
+              i_log_handle  = gv_log_handle
+         EXCEPTIONS
+              log_not_found = 0
+              OTHERS        = 1.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_LOG->MSG_ADD_WITH_EXTENDED_LONGTEXT
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] IT_DATA_TAB                    TYPE        SRT_XML_DATA_TAB
+* | [--->] IV_PROBCLASS                   TYPE        BAL_S_MSG-PROBCLASS
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD msg_add_with_extended_longtext.
+    DATA:ls_msg       TYPE bal_s_msg,
+         ls_data_tab  LIKE LINE OF it_data_tab,
+         ls_par       TYPE bal_s_par,
+         lv_secs      TYPE p,
+         ls_time      TYPE timestamp,
+         lv_timestamp TYPE timestamp.
+    CONVERT DATE '19700101' INTO TIME STAMP ls_time TIME ZONE 'UTC'.
+
+    LOOP AT it_data_tab INTO ls_data_tab.
+      CASE ls_data_tab-tag_name.
+        WHEN if_cuan_wechat_constant=>sc_field_name-from_user_name.
+          ls_par-parname  = 'FROMUSER'.                     "#EC NOTEXT
+          ls_par-parvalue = ls_data_tab-tag_value.
+          APPEND ls_par TO ls_msg-params-t_par.
+        WHEN if_cuan_wechat_constant=>sc_field_name-to_user_name.
+          ls_par-parname  = 'TOUSER'.                       "#EC NOTEXT
+          ls_par-parvalue = ls_data_tab-tag_value.
+          APPEND ls_par TO ls_msg-params-t_par.
+        WHEN if_cuan_wechat_constant=>sc_field_name-msg_type.
+          ls_par-parname  = 'MSGTYPE'.                      "#EC NOTEXT
+          ls_par-parvalue = ls_data_tab-tag_value.
+          APPEND ls_par TO ls_msg-params-t_par.
+        WHEN if_cuan_wechat_constant=>sc_field_name-msg_event.
+          ls_par-parname  = 'EVENT'.                        "#EC NOTEXT
+          ls_par-parvalue = ls_data_tab-tag_value.
+          APPEND ls_par TO ls_msg-params-t_par.
+        WHEN if_cuan_wechat_constant=>sc_field_name-create_time.
+          ls_par-parname  = 'CREATETIME'.                   "#EC NOTEXT
+          lv_secs = ls_data_tab-tag_value.
+          cl_abap_tstmp=>add(
+                    EXPORTING
+                          tstmp                      = ls_time
+                          secs                       = lv_secs
+                    RECEIVING
+                         r_tstmp                    = lv_timestamp ).
+          ls_par-parvalue = lv_timestamp.
+          APPEND ls_par TO ls_msg-params-t_par.
+        WHEN OTHERS.
+      ENDCASE.
+    ENDLOOP.
+    ls_msg-params-altext = 'CUAN_WECHAT_MESSGAE_DETAIL'.
+*   define data of message for Application Log
+    ls_msg-msgty     = sy-msgty.
+    ls_msg-msgid     = sy-msgid.
+    ls_msg-msgno     = sy-msgno.
+    ls_msg-msgv1     = sy-msgv1.
+    ls_msg-msgv2     = sy-msgv2.
+    ls_msg-msgv3     = sy-msgv3.
+    ls_msg-msgv4     = sy-msgv4.
+    ls_msg-probclass = iv_probclass.
+    "ls_msg-params = iv_params.
+*   add this message to log file
+*   we do not specify I_LOG_HANDLE since we want to add this message
+*   to the default log. If it does not exist we do not care
+*   (EXCEPTIONS log_not_found = 0).
+    CALL FUNCTION 'BAL_LOG_MSG_ADD'
+      EXPORTING
+        i_s_msg       = ls_msg
+        i_log_handle  = gv_log_handle
+      EXCEPTIONS
+        log_not_found = 0
+        OTHERS        = 1.
+
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_LOG->READ
+* +-------------------------------------------------------------------------------------------------+
+* | [--->] I_READ_TEXTS                   TYPE        BOOLEAN (default =SPACE)
+* | [--->] I_LANGU                        TYPE        SYLANGU (default =SY-LANGU)
+* | [<---] ES_LOG                         TYPE        BAL_S_LOG
+* | [<---] ES_STATISTICS                  TYPE        BAL_S_SCNT
+* | [<---] ET_MSG                         TYPE        BAL_T_MSGR
+* | [<---] ET_EXC                         TYPE        BAL_T_EXCR_MASS
+* | [EXC!] LOG_NOT_FOUND
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD read.
+    CALL FUNCTION 'BAL_LOG_READ'
+        EXPORTING i_log_handle = gv_log_handle
+                  i_read_texts = i_read_texts
+                  i_langu = i_langu
+        IMPORTING
+          es_log = es_log
+          es_statistics = es_statistics
+          et_msg = et_msg
+          et_exc = et_exc
+        EXCEPTIONS
+          log_not_found.
+  ENDMETHOD.
+
+
+* <SIGNATURE>---------------------------------------------------------------------------------------+
+* | Instance Public Method CL_CUAN_WECHAT_LOG->SAVE
+* +-------------------------------------------------------------------------------------------------+
+* +--------------------------------------------------------------------------------------</SIGNATURE>
+  METHOD save.
+
+    DATA: lt_logh TYPE bal_t_logh.
+
+    APPEND gv_log_handle TO lt_logh.
+
+    CALL FUNCTION 'BAL_DB_SAVE'
+        EXPORTING i_t_log_handle = lt_logh.
+  ENDMETHOD.
+ENDCLASS.

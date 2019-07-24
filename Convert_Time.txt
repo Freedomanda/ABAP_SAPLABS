@@ -1,0 +1,18 @@
+  METHOD CONVERT_TIME.
+
+    DATA: ls_time TYPE timestamp,
+          lv_secs TYPE p.
+
+    CONVERT DATE '19700101' INTO TIME STAMP ls_time TIME ZONE 'UTC'.
+    CLEAR: ev_timestemp.
+
+    lv_secs = iv_secs.
+    cl_abap_tstmp=>add(
+      EXPORTING
+        tstmp                      = ls_time    " UTC Time Stamp
+        secs                       = lv_secs   " Time Interval in Seconds
+      RECEIVING
+        r_tstmp                    = ev_timestemp    " UTC Time Stamp
+    ).
+   CONVERT DATE sy-datum TIME sy-uzeit INTO TIME STAMP lv_current_time TIME ZONE 'UTC'.
+  ENDMETHOD.

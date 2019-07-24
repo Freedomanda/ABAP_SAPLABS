@@ -1,0 +1,293 @@
+  METHOD cpg_ext_data_post.
+    DATA lo_srv_mgr              TYPE REF TO /bobf/if_tra_service_manager.
+    DATA lo_orc_srv_mgr          TYPE REF TO /bobf/if_tra_service_manager.
+    DATA:
+      ls_ext_reporting_data TYPE cuan_s_ini_ext_data,
+      lt_ext_reporting_data TYPE cuan_t_ini_ext_data.
+    DATA lt_initiative_root      TYPE cuan_t_initiative_root.
+    DATA:
+      ls_modification TYPE /bobf/s_frw_modification,
+      lt_modification TYPE /bobf/t_frw_modification.
+    DATA lr_ext_reporting_data   TYPE REF TO cuan_s_ini_ext_data.
+    DATA lo_bobf_transaction_mgr TYPE REF TO  /bobf/if_tra_transaction_mgr.
+    DATA lo_change               TYPE REF TO /bobf/if_tra_change.
+    DATA lo_message              TYPE REF TO /bobf/if_frw_message.
+    DATA ls_ext_data             TYPE ty_da_campaign.
+    DATA lt_sel_param            TYPE /bobf/t_frw_query_selparam.
+    DATA lt_req_field            TYPE /bobf/t_frw_name.
+    DATA ls_message              TYPE bapiret2.
+    DATA ls_msg                  TYPE symsg.
+    DATA ls_log_msg              TYPE bal_s_msg.
+    DATA lv_key                  TYPE sysuuid_x16.
+    DATA ls_mktorch_rt          TYPE cuan_d_mktorc_rt.
+     DATA lt_trigger  TYPE cuan_t_marketing_orc_trigger.
+     DATA ls_trigger  TYPE cuan_s_marketing_orc_trigger.
+
+    DATA:
+      lt_bobf_key TYPE /bobf/t_frw_key,
+      lt_ini      TYPE cuan_t_initiative_root,
+      ls_ini      TYPE cuan_s_initiative_root,
+      lv_orch_key          TYPE /bobf/conf_key,
+      lv_trigger_key      TYPE /bobf/conf_key,
+      ls_orch_key       TYPE /bobf/s_frw_key,
+      lt_orch_key           TYPE /bobf/t_frw_key,
+      ls_trigger_key       TYPE /bobf/s_frw_key,
+      lt_trigger_key           TYPE /bobf/t_frw_key,
+      lt_action          TYPE cuan_t_marketing_orc_action,
+      ls_action          TYPE cuan_s_marketing_orc_action,
+      lt_trq_key  TYPE /bobf/t_frw_key,
+      lt_root_key TYPE /bobf/t_frw_key,
+      ls_root_key TYPE /bobf/s_frw_key.
+
+    DATA:
+      lo_performance              TYPE REF TO cl_cuan_cmpgn_performance,
+      lo_helper                   TYPE REF TO cl_cuan_cpg_get_ext_data_glb,
+      ls_performance_process_comm TYPE cuan_s_perfor_process_comm,
+      lt_performance_success      TYPE cuan_t_cmpgn_perf_success,
+      ls_performance_success      TYPE cuan_s_cmpgn_perf_success,
+      ls_performance_success_tmp  TYPE cuan_s_cmpgn_perf_success,
+      lt_performance_success_tmp  TYPE cuan_t_cmpgn_perf_success.
+    DATA: lv_reporting_date TYPE d.
+
+    FIELD-SYMBOLS <ls_ext_reporting_data> TYPE cuan_s_ini_ext_data.
+
+    lo_srv_mgr = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_initiative_c=>sc_bo_key ).
+    lo_orc_srv_mgr  = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_marketing_orch_c=>sc_bo_key ).
+
+    LOOP AT it_ext_data INTO ls_ext_data.
+
+      APPEND VALUE #( attribute_name = 'ID'
+                 sign           = 'I'
+                 option         = 'EQ'
+                 low            =  ls_ext_data-initiative_id ) TO lt_sel_param.
+
+    ENDLOOP.
+
+* -------------------------------------------------------------
+* Query out the current campaign
+* -------------------------------------------------------------
+    lo_srv_mgr->query(
+        EXPORTING
+          iv_query_key            = if_cuan_initiative_c=>sc_query-root-select_all
+          it_selection_parameters = lt_sel_param
+          iv_fill_data            = abap_true
+        IMPORTING
+          et_data                 = lt_initiative_root
+          et_key                  = lt_trq_key ).
+
+    CREATE OBJECT lo_helper.
+    LOOP AT it_ext_data INTO ls_ext_data.
+
+      CLEAR lt_root_key.
+      CLEAR lt_ext_reporting_data.
+      CLEAR ls_ext_reporting_data.
+
+      READ TABLE lt_initiative_root WITH KEY id = ls_ext_data-initiative_id INTO ls_ini.
+
+      IF sy-subrc <> 0.
+
+        MESSAGE e041(cuan_wechat) WITH ls_ext_data-ext_campaign_id INTO ls_msg.
+        ls_msg-msgty = sy-msgty.
+        ls_msg-msgid = sy-msgid.
+        ls_msg-msgno = sy-msgno.
+        APPEND ls_msg TO et_messages.
+
+        MESSAGE e041(cuan_wechat) WITH ls_ext_data-ext_campaign_id INTO ls_message-message.
+        ls_message-type   = sy-msgty.
+        ls_message-id     = sy-msgid.
+        ls_message-number = sy-msgno.
+        APPEND ls_message TO et_messages_bapi.
+
+        MOVE-CORRESPONDING ls_msg TO ls_log_msg.
+        CONTINUE.
+      ELSE.
+        IF ls_ini-campaignperfupdatestatus = '02'. "Performance updated is stop to update
+          MESSAGE e048(cuan_wechat) WITH ls_ext_data-ext_campaign_id INTO ls_msg.
+          ls_msg-msgty = sy-msgty.
+          ls_msg-msgid = sy-msgid.
+          ls_msg-msgno = sy-msgno.
+          APPEND ls_msg TO et_messages.
+
+          MESSAGE e048(cuan_wechat) WITH ls_ext_data-ext_campaign_id INTO ls_message-message.
+          ls_message-type   = sy-msgty.
+          ls_message-id     = sy-msgid.
+          ls_message-number = sy-msgno.
+          APPEND ls_message TO et_messages_bapi.
+
+          MOVE-CORRESPONDING ls_msg TO ls_log_msg.
+          CONTINUE.
+        ENDIF.
+      ENDIF.
+
+      CONVERT TIME STAMP ls_ext_data-timestamp TIME ZONE ls_ini-cpg_timezone INTO
+          DATE lv_reporting_date .
+
+
+
+*     MOVE-CORRESPONDING ls_ext_data TO ls_ext_reporting_data.
+      MOVE ls_ext_data-ext_campaign_id              TO ls_performance_success-externalcampaignid.
+      MOVE ls_ext_data-execution_run_key            TO ls_performance_success-campaignexecutionrun.
+
+
+
+
+
+
+
+
+
+*      MOVE ls_ext_data-execution_run_key            TO ls_performance_success-campaignautomationactionuuid.
+      MOVE lv_reporting_date                        TO ls_performance_success-campaignperformancedate.
+
+      MOVE ls_ini-cpg_timezone                      TO ls_performance_success-campaignperformancedatezone.
+      MOVE ls_ext_data-rejected_messages            TO ls_performance_success-numberofrejectedmessages.
+      MOVE ls_ext_data-sent_messages                TO ls_performance_success-numberofsentmessages.
+      MOVE ls_ext_data-delivered_messages           TO ls_performance_success-numberofdeliveredmessages.
+      MOVE ls_ext_data-numberofexecutedinteractions TO ls_performance_success-numberofexecutedinteractions.
+      MOVE ls_ext_data-numberoffailedinteractions   TO ls_performance_success-numberoffailedinteractions.
+      MOVE ls_ext_data-interactionreason            TO ls_performance_success-interactionreason.
+      MOVE ls_ext_data-interactiontype              TO ls_performance_success-interactiontype.
+      MOVE ls_ext_data-comm_medium                  TO ls_performance_success-communicationmedium.
+
+      ls_root_key-key = ls_ini-key.
+      APPEND ls_root_key TO lt_root_key.
+
+
+*     ADD execution run key to campaignautomationexternaluuid
+*      READ TABLE cuan_d_mktorc_rt INTO ls_mktorc_root WITH KEY initiative_id = ls_ext_data-initiative_id.
+
+
+      SELECT SINGLE db_key FROM cuan_d_mktorc_rt INTO lv_orch_key
+                WHERE initiative_id = ls_ext_data-initiative_id."#EC CI_NOFIELD?
+
+
+
+      IF lv_orch_key IS NOT INITIAL.
+            ls_orch_key-key = lv_orch_key.
+            APPEND ls_orch_key TO lt_orch_key.
+
+
+
+       lo_orc_srv_mgr->retrieve_by_association(
+             EXPORTING
+               iv_node_key             = if_cuan_marketing_orch_c=>sc_node-root
+               it_key                  = lt_orch_key
+               iv_association = if_cuan_marketing_orch_c=>sc_association-root-start_trigger
+               iv_fill_data   = abap_true
+             IMPORTING
+                 et_data                 = lt_trigger ).
+
+             READ TABLE lt_trigger INTO ls_trigger INDEX 1.
+      IF sy-subrc = 0.
+*Trigger key
+            ls_trigger_key-key = ls_trigger-key.
+            APPEND ls_trigger_key TO lt_trigger_key.
+            lo_orc_srv_mgr->retrieve_by_association(
+            EXPORTING
+              iv_node_key    = if_cuan_marketing_orch_c=>sc_node-trigger
+              it_key         = lt_trigger_key
+              iv_association = if_cuan_marketing_orch_c=>sc_association-trigger-action
+              iv_fill_data   = abap_true
+            IMPORTING
+              et_data        = lt_action ).
+      IF lt_action is NOT INITIAL.
+            READ TABLE lt_action INTO ls_action INDEX 1.
+
+            MOVE ls_action-key TO ls_performance_success-campaignautomationactionuuid.
+            ENDIF.
+            ENDIF.
+
+      ENDIF.
+* -------------------------------------------------------------
+* Get reporting data (success data)
+* -------------------------------------------------------------
+      lo_srv_mgr->retrieve_by_association(
+             EXPORTING
+               iv_node_key             = if_cuan_initiative_c=>sc_node-root
+               it_key                  = lt_root_key
+               iv_association          = if_cuan_initiative_c=>sc_association-root-external_reporting_data
+               iv_fill_data            = abap_true
+             IMPORTING
+               et_data                 = lt_ext_reporting_data ).
+
+      IF lt_ext_reporting_data IS INITIAL. " No reporting data in database table cuand_ini_extdat
+
+        LOOP AT lt_initiative_root ASSIGNING FIELD-SYMBOL(<ls_initiative_root>)
+          WHERE id = ls_ini-id .
+
+          " get new fields to create reporting data
+          MOVE <ls_initiative_root>-id                 TO ls_performance_success-campaignid.
+          MOVE <ls_initiative_root>-root_key           TO ls_performance_success-campaignuuid.
+          MOVE <ls_initiative_root>-type               TO ls_performance_success-campaigncategory.
+
+          APPEND ls_performance_success TO lt_performance_success.
+
+        ENDLOOP.
+
+      ELSE. " Reporting data found in database table cuand_ini_extdat
+        READ TABLE lt_initiative_root ASSIGNING <ls_initiative_root> INDEX 1.
+        READ TABLE lt_ext_reporting_data ASSIGNING <ls_ext_reporting_data>
+          WITH KEY campaignsuccessimportmethod = '03'
+                   "execution_run_key = ls_ext_data-execution_run_key
+                   reporting_date = lv_reporting_date
+                   interactionreason = ls_performance_success-interactionreason
+                   interactiontype   = ls_performance_success-interactiontype.
+
+        IF sy-subrc = 0.
+          CLEAR ls_performance_success_tmp.
+          CALL METHOD lo_helper->map_perform_between_gfn_and_be
+            EXPORTING
+              is_success_db  = <ls_ext_reporting_data>
+            CHANGING
+              cs_success_gfn = ls_performance_success_tmp.
+*              ct_success_gfn = lt_performance_success_tmp.
+
+*          LOOP AT lt_performance_success_tmp INTO ls_performance_success_tmp.
+          MOVE <ls_initiative_root>-id       TO ls_performance_success_tmp-campaignid.
+          MOVE <ls_initiative_root>-root_key TO ls_performance_success_tmp-campaignuuid.
+          MOVE <ls_initiative_root>-type     TO ls_performance_success_tmp-campaigncategory.
+          ls_performance_success_tmp-numberofdeliveredmessages = ls_performance_success_tmp-numberofdeliveredmessages + ls_performance_success-numberofdeliveredmessages.
+          ls_performance_success_tmp-numberofrejectedmessages = ls_performance_success_tmp-numberofrejectedmessages + ls_performance_success-numberofrejectedmessages.
+          ls_performance_success_tmp-numberofsentmessages = ls_performance_success_tmp-numberofsentmessages + ls_performance_success-numberofsentmessages.
+          ls_performance_success_tmp-numberofexecutedinteractions = ls_performance_success_tmp-numberofexecutedinteractions + ls_performance_success-numberofexecutedinteractions.
+          ls_performance_success_tmp-numberoffailedinteractions = ls_performance_success_tmp-numberoffailedinteractions + ls_performance_success-numberoffailedinteractions.
+          ls_performance_success_tmp-communicationmedium = ls_performance_success-communicationmedium.
+*         find the campaignautomationuuid
+          APPEND ls_performance_success_tmp TO lt_performance_success.
+
+*          ENDLOOP.
+        ELSE.
+          MOVE <ls_initiative_root>-id                 TO ls_performance_success-campaignid.
+          MOVE <ls_initiative_root>-root_key           TO ls_performance_success-campaignuuid.
+          MOVE <ls_initiative_root>-type               TO ls_performance_success-campaigncategory.
+
+          APPEND ls_performance_success TO lt_performance_success.
+
+        ENDIF.
+
+      ENDIF.
+
+    ENDLOOP.
+
+    IF lt_performance_success IS NOT INITIAL.
+* -------------------------------------------------------------
+* Set Campaign Success Import Method to 03: Interface (pull)
+* -------------------------------------------------------------
+      ls_performance_process_comm-performance_input_method  = '03'.
+
+      CREATE OBJECT lo_performance.
+
+      TRY .
+          lo_performance->performance_process(
+                  EXPORTING
+                    is_performance_process_comm     = ls_performance_process_comm
+                   IMPORTING
+                    et_messages_bapi                = et_messages_bapi
+                    et_messages                     = et_messages
+                  CHANGING
+                    ct_performance_success          = lt_performance_success  ).
+        CATCH /iwbep/cx_mgw_tech_exception.
+        CATCH /iwbep/cx_mgw_busi_exception.
+      ENDTRY.
+    ENDIF.
+  ENDMETHOD.
