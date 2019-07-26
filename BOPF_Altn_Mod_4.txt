@@ -1,0 +1,62 @@
+*&---------------------------------------------------------------------*
+*& Report ZBOBF_TEST6
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zbobf_test6.
+
+DATA: lt_facet_key    TYPE TABLE OF cuan_s_ce_ic_facet_key,
+      lt_facet_keys   TYPE /bobf/t_frw_key,
+      lt_marketing_area TYPE cuan_t_ce_ic_mkt_area,
+      lr_marketing_area   TYPE REF TO cuan_s_ce_ic_mkt_area,
+      ls_mod          TYPE /bobf/s_frw_modification,
+      lt_mod          TYPE /bobf/t_frw_modification.
+
+APPEND VALUE #( id_origin = 'WECHAT_OPEN_ID'
+                id = 'olvNV0cYI2kc86KfTLmFSbhmCEx0' ) TO lt_facet_key.
+
+DATA(lo_transaction_mgr) = /bobf/cl_tra_trans_mgr_factory=>get_transaction_manager( ).
+* get facet service manager
+DATA(lo_ic_mgr)          = /bobf/cl_tra_serv_mgr_factory=>get_service_manager( iv_bo_key = if_cuan_ce_interact_contact_c=>sc_bo_key ).
+lo_ic_mgr->convert_altern_key(
+  EXPORTING
+    iv_node_key          = if_cuan_ce_interact_contact_c=>sc_node-facet
+    iv_altkey_key        = if_cuan_ce_interact_contact_c=>sc_alternative_key-facet-ic_facet_key
+    it_key               = lt_facet_key
+  IMPORTING
+    et_key               = lt_facet_keys ).
+
+lo_ic_mgr->retrieve_by_association(
+  EXPORTING iv_node_key = if_cuan_ce_interact_contact_c=>sc_node-facet
+            it_key = lt_facet_keys
+            iv_association = if_cuan_ce_interact_contact_c=>sc_association-facet-marketing_area
+            iv_fill_data = abap_true
+   IMPORTING et_data = lt_marketing_area ).
+
+CREATE DATA lr_marketing_area.
+lr_marketing_area->key        = /bobf/cl_frw_factory=>get_new_key( ).
+lr_marketing_area->parent_key =  '6C0B84B755231EE8A58F8B775536D264'.
+lr_marketing_area->root_key   = '6C0B84B755231EE8A58F8B775536B264'.
+lr_marketing_area->mkt_area_id = 'GLOBAL'.
+
+ls_mod-change_mode =  /bobf/if_frw_c=>sc_modify_create.
+ls_mod-key = lr_marketing_area->key.
+ls_mod-association = if_cuan_ce_interact_contact_c=>sc_association-facet-marketing_area.
+*ls_mod-root_key = lr_marketing_area->root_key.
+ls_mod-source_node = if_cuan_ce_interact_contact_c=>sc_node-facet.
+ls_mod-source_key  = lr_marketing_area->parent_key.
+ls_mod-node = if_cuan_ce_interact_contact_c=>sc_node-marketing_area.
+ls_mod-data = lr_marketing_area.
+APPEND ls_mod TO lt_mod.
+
+lo_ic_mgr->modify(
+  EXPORTING
+    it_modification = lt_mod
+  IMPORTING
+    eo_change = DATA(lo_change)
+    eo_message = DATA(lo_message) ).
+*save the modification
+  lo_transaction_mgr->save( ).
+
+
+BREAK-POINT.
