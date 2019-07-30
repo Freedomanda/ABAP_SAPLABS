@@ -1,0 +1,306 @@
+*&---------------------------------------------------------------------*
+*& Report ZCWU_CALL_ODATA
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT zcwu_call_odata.
+
+DATA: lt_resut TYPE zdcs_feed,
+      lt_header TYPE tihttpnvp,
+      lt_header2 TYPE tihttpnvp,
+      lt_header3 TYPE tihttpnvp.
+
+PARAMETERS: p_host TYPE string LOWER CASE.
+PARAMETERS: get RADIOBUTTON GROUP rbg1,
+            post RADIOBUTTON GROUP rbg1.
+PARAMETERS: cb_csrf TYPE char1 AS CHECKBOX.
+
+
+START-OF-SELECTION.
+
+CALL METHOD cl_http_client=>create_by_url
+  EXPORTING
+    url                    =  p_host
+  IMPORTING
+    client                 =  DATA(http_client)
+  EXCEPTIONS
+    argument_not_found     = 1
+    plugin_not_active      = 2
+    internal_error         = 3
+    pse_not_found          = 4
+    pse_not_distrib        = 5
+    pse_errors             = 6
+    OTHERS                 = 7
+        .
+IF sy-subrc <> 0.
+* Implement suitable error handling here
+ENDIF.
+
+CASE abap_true.
+  WHEN get.
+    PERFORM request_get.
+
+  WHEN post.
+    IF cb_csrf IS INITIAL.
+      PERFORM request_post.
+    ELSE.
+      PERFORM request_with_csrf.
+    ENDIF.
+
+  WHEN OTHERS.
+ENDCASE.
+
+
+*&---------------------------------------------------------------------*
+*& Form request_with_csrf
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM request_with_csrf .
+* Set request method to GET or POST
+  APPEND VALUE #( name = 'x-csrf-token' value = 'Fetch' ) TO lt_header.
+  http_client->request->set_method( if_http_request=>co_request_method_get ).
+  http_client->request->set_header_fields( lt_header ).
+  http_client->propertytype_accept_cookie = if_http_client=>co_enabled.
+  http_client->propertytype_logon_popup = http_client->co_disabled.
+* Set request method to GET or POST
+  http_client->request->set_authorization( username = 'C5275218' password = 'Sap@2018' ).
+
+*   Send request
+  CALL METHOD http_client->send
+      EXCEPTIONS
+        http_communication_failure = 1
+        http_invalid_state         = 2.
+
+  CALL METHOD http_client->receive
+      EXCEPTIONS
+        http_communication_failure = 1
+        http_invalid_state         = 2
+        http_processing_failed     = 3.
+
+
+  IF sy-subrc = 0.
+    CALL METHOD http_client->response->get_status
+      IMPORTING
+        code = DATA(lv_http_status)
+        reason = DATA(lv_status_text).
+        CALL METHOD http_client->get_last_error
+        IMPORTING
+          code    = DATA(lv_sysubrc)
+          message = DATA(lv_error_msg).
+    CALL METHOD http_client->response->get_header_fields
+      CHANGING
+        fields = lt_header2.
+    APPEND VALUE #( lt_header2[ name = 'x-csrf-token' ] OPTIONAL ) TO lt_header3.
+    DATA(ev_response) = http_client->response->get_cdata( ).
+    DATA(ev_xresponse) = http_client->response->get_data( ).
+*    http_client->close( ). "Not close since there is another request session
+  ENDIF.
+
+   CHECK lv_http_status = 200.
+
+   http_client->request->set_method( if_http_request=>co_request_method_post ).
+*   http_client->propertytype_accept_cookie = if_http_client=>co_enabled.
+  APPEND VALUE #( name = 'Content-Type' value = 'application/json' ) TO lt_header3.
+  http_client->request->set_header_fields( lt_header3 ).
+  http_client->propertytype_logon_popup = http_client->co_disabled.
+*       Set request method to GET or POST
+      http_client->request->set_authorization( username = 'C5275218' password = 'Sap@2018' ).
+      DATA(request_body) = |\{"Process":"Process1_ABD","ProcessVersion": "V1",| &&
+                |"Altpartnerid":"ALTID", "Organizationid": "Orgid1",| &&
+                |"Creaton":"2019-06-10T05:09:08","Status":"Succ",| &&
+                |"Action":"Create"\} |.
+      http_client->request->set_cdata( request_body ).
+
+*   Send request
+  CALL METHOD http_client->send
+      EXCEPTIONS
+        http_communication_failure = 1
+        http_invalid_state         = 2.
+
+  CALL METHOD http_client->receive
+      EXCEPTIONS
+        http_communication_failure = 1
+        http_invalid_state         = 2
+        http_processing_failed     = 3.
+
+
+  IF sy-subrc = 0.
+    CALL METHOD http_client->response->get_status
+      IMPORTING
+        code = lv_http_status
+        reason = lv_status_text.
+
+    DATA(ev_response2) = http_client->response->get_cdata( ).
+    DATA(ev_xresponse2) = http_client->response->get_data( ).
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form request_get
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM request_get .
+* Set request method to GET or POST
+    APPEND VALUE #( name = 'x-csrf-token' value = 'Fetch' ) TO lt_header.
+    http_client->request->set_method( if_http_request=>co_request_method_get ).
+    http_client->request->set_header_fields( lt_header ).
+    http_client->propertytype_logon_popup = http_client->co_disabled.
+*     Set request method to GET or POST
+    http_client->request->set_authorization( username = 'C5275218' password = 'Sap@2018' ).
+
+*     Send request
+    CALL METHOD http_client->send
+        EXCEPTIONS
+          http_communication_failure = 1
+          http_invalid_state         = 2.
+
+    CALL METHOD http_client->receive
+        EXCEPTIONS
+          http_communication_failure = 1
+          http_invalid_state         = 2
+          http_processing_failed     = 3.
+
+
+    IF sy-subrc = 0.
+      CALL METHOD http_client->response->get_status
+        IMPORTING
+          code = DATA(lv_http_status)
+          reason = DATA(lv_status_text).
+          CALL METHOD http_client->get_last_error
+          IMPORTING
+            code    = DATA(lv_sysubrc)
+            message = DATA(lv_error_msg).
+      CALL METHOD http_client->response->get_header_fields
+        CHANGING
+          fields = lt_header2.
+      DATA(ev_response) = http_client->response->get_cdata( ).
+      DATA(ev_xresponse) = http_client->response->get_data( ).
+*      http_client->close( ). "Not close since there is another request session
+    ENDIF.
+
+    CALL TRANSFORMATION id
+      SOURCE XML ev_xresponse
+      RESULT XML DATA(lv_xstring).
+
+*    parse xstring to table
+      cl_soap_xml_parser=>get_data(
+        EXPORTING
+          xdoc       = lv_xstring
+        IMPORTING
+          data       = DATA(lt_data)
+          error_text = DATA(lv_error_text) ).
+
+    DELETE lt_data WHERE  tag_level <= 4.
+
+    DATA: ls_dcs_request TYPE zdcs_requests,
+          lt_dcs_request TYPE zdcs_requests_t.
+
+    LOOP AT lt_data INTO DATA(ls_data).
+      ASSIGN COMPONENT 'TAG_VALUE'  OF STRUCTURE ls_data
+      TO FIELD-SYMBOL(<fs_component>).
+      DATA(str) = ls_data-tag_name+2.
+      ASSIGN COMPONENT  str OF STRUCTURE ls_dcs_request
+      TO FIELD-SYMBOL(<fs_dcs_field>).
+      IF <fs_dcs_field> IS NOT ASSIGNED.
+        CONTINUE.
+      ENDIF.
+      TRY .
+          <fs_dcs_field> = <fs_component>.
+        CATCH cx_sy_conversion_no_number.
+          REPLACE ALL OCCURRENCES OF REGEX'(-)|(:)|(T)' IN <fs_component> WITH ''.
+          DATA(lv_date) = CONV dats(  <fs_component>(8) ).
+          DATA(lv_time) = CONV tims( <fs_component>+8 ).
+          CONVERT DATE lv_date TIME lv_time INTO TIME STAMP <fs_dcs_field> TIME ZONE 'UTC'.
+      ENDTRY.
+      IF to_upper( ls_data-tag_name+2 ) = 'ACTION' .
+        APPEND ls_dcs_request TO lt_dcs_request.
+        CLEAR: ls_dcs_request.
+      ENDIF.
+      UNASSIGN: <fs_component>,<fs_dcs_field>.
+    ENDLOOP.
+
+    TRY.
+    CALL METHOD cl_abap_conv_in_ce=>create
+      EXPORTING
+        encoding    = 'UTF-8'
+        replacement = '#'
+        ignore_cerr = abap_true
+        input       = ev_xresponse
+      RECEIVING
+        conv        = DATA(loc_conv)
+        .
+      CATCH cx_parameter_invalid_range.
+      CATCH cx_sy_codepage_converter_init.
+    ENDTRY.
+
+    DATA: l_str TYPE string.
+    TRY.
+        CALL METHOD loc_conv->read
+          IMPORTING
+            data = l_str.
+        SPLIT l_str AT cl_abap_char_utilities=>newline INTO TABLE DATA(result_tab) .
+      CATCH cx_sy_conversion_codepage.
+      CATCH cx_sy_codepage_converter_init.
+      CATCH cx_parameter_invalid_type.
+      CATCH cx_parameter_invalid_range.
+    ENDTRY.
+
+    CALL METHOD cl_demo_output=>display
+      EXPORTING
+        data = lt_dcs_request.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form request_post
+*&---------------------------------------------------------------------*
+*& Without CSRF Check
+*& ~CHECK_CSRF_TOKEN = 0
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM request_post .
+* Set request method to GET or POST
+  APPEND VALUE #( name = 'Content-Type' value = 'application/json' ) TO lt_header3.
+  APPEND VALUE #( name = 'X-Requested-With' value = 'X' ) TO lt_header3.
+  http_client->request->set_header_fields( lt_header3 ).
+  http_client->request->set_method( if_http_request=>co_request_method_post ).
+  http_client->propertytype_logon_popup = http_client->co_disabled.
+*   Set request method to GET or POST
+  http_client->request->set_authorization( username = 'C5275218' password = 'Sap@2018' ).
+  DATA(request_body) = |\{"Process":"Process1","ProcessVersion": "V1",| &&
+            |"Altpartnerid":"ALTID", "Organizationid": "ABD",| &&
+            |"Creaton":"2019-06-10T05:09:08","Status":"Failed",| &&
+            |"Action":"Create"\} |.
+  http_client->request->set_cdata( request_body ).
+
+*   Send request
+  CALL METHOD http_client->send
+      EXCEPTIONS
+        http_communication_failure = 1
+        http_invalid_state         = 2.
+
+  CALL METHOD http_client->receive
+      EXCEPTIONS
+        http_communication_failure = 1
+        http_invalid_state         = 2
+        http_processing_failed     = 3.
+
+  IF sy-subrc = 0.
+    CALL METHOD http_client->response->get_status
+      IMPORTING
+        code = DATA(lv_http_status)
+        reason = DATA(lv_status_text).
+    CALL METHOD http_client->get_last_error
+        IMPORTING
+          code    = DATA(lv_sysubrc2)
+          message = DATA(lv_error_msg2).
+    DATA(ev_response) = http_client->response->get_cdata( ).
+  ENDIF.
+ENDFORM.
