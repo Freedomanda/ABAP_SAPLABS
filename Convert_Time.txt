@@ -15,4 +15,13 @@
         r_tstmp                    = ev_timestemp    " UTC Time Stamp
     ).
    CONVERT DATE sy-datum TIME sy-uzeit INTO TIME STAMP lv_current_time TIME ZONE 'UTC'.
+	  lv_date = ls_option_range-high.
+          lv_time = '235959'.
+          CONCATENATE lv_date lv_time INTO lv_local_timestamp.
+          CALL FUNCTION 'TZ_LOCAL_TO_GLOBAL' "#EC FB_OLDED
+            EXPORTING
+              timestamp_local = lv_local_timestamp
+              timezone  = lv_timezone
+            IMPORTING
+              timestamp_global =  lv_global_timestamp.
   ENDMETHOD.

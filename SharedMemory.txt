@@ -1,0 +1,101 @@
+*&---------------------------------------------------------------------*
+*& Report Z_USE_SHAREMEMORY
+*&---------------------------------------------------------------------*
+*&
+*&---------------------------------------------------------------------*
+REPORT z_use_sharememory.
+
+" 1. SE24 to create root class with private attribute and 2 public class
+"    to get and set private attribute
+" 2. SHMA to crate and generate Shared Memory Area
+" 3. Use the handle class of Shared Memory Area to read update memory
+" 4. SHMM is used for monitoring shared memory areas for memory
+*    consumption and to display data stored in shared memory objects.
+
+DATA lt_vbeln TYPE vbeln_vl_t.
+DATA ls_vbeln LIKE LINE OF lt_vbeln.
+
+DATA lr_handle TYPE REF TO z_vbrk_shm_table_area.
+
+*Update
+PERFORM update.
+
+"Read
+PERFORM read.
+
+
+*&---------------------------------------------------------------------*
+*& Form read
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM read .
+*  The below ABAP report whose source code is given reads shared memory
+*  object value.Root class attach_for_read method must be called before
+*  reading shared memory data using our custom Get_Vbeln method.
+*  at the end of the read process, ABAP developers must call detach()
+*  method to free shared memory object.
+  lr_handle = z_vbrk_shm_table_area=>attach_for_read( ).
+  lr_handle->root->get_vbeln( IMPORTING invoices = lt_vbeln ).
+  lr_handle->detach( ).
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form update
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM update .
+*Following ABAP report is demonstrating how to assign shared memory
+*object value. First of all, using below ABAP a check is done to see
+*if an active version of the shared memory object exists or not.
+*This check is done by reading the shared memory object.
+*If cx_shm_no_active_version exception is catched in the ABAP
+*TRY and CATCH syntax, then ABAP developer should use attach_for_write
+*method while creating the root class object handle.
+*Otherwise, attach_for_update method can be used during
+*root creation of the root class handle.
+  DATA lt_vbeln TYPE vbeln_vl_t.
+  DATA ls_vbeln LIKE LINE OF lt_vbeln.
+
+  DATA lr_handle TYPE REF TO z_vbrk_shm_table_area.
+      " Area Class
+  DATA lr_root TYPE REF TO z_vbrk_shm_table_root.
+    " Root attribute of handle class. SHM: Model of a Data Clas
+
+*  *****************************************************
+*   First Try to Read
+  DATA excp TYPE REF TO cx_shm_no_active_version.
+  DATA lf_readerror TYPE c1.
+
+  TRY.
+   lr_handle = z_vbrk_shm_table_area=>attach_for_read( ).
+   lr_handle->root->get_vbeln( IMPORTING invoices = lt_vbeln ).
+   lr_handle->detach( ).
+  CATCH cx_shm_no_active_version INTO excp.
+   lf_readerror = 'X'.
+  ENDTRY.
+*  *****************************************************
+  SELECT vbeln FROM vbrk
+    UP TO 10 ROWS
+    INTO  TABLE lt_vbeln.
+
+  IF lf_readerror = 'X'.
+   lr_handle = z_vbrk_shm_table_area=>attach_for_write( ).
+  ELSE.
+   lr_handle = z_vbrk_shm_table_area=>attach_for_update( ).
+  ENDIF.
+
+  CREATE OBJECT lr_root AREA HANDLE lr_handle.
+  lr_handle->set_root( lr_root ).
+
+  lr_root->set_vbeln( invoices = lt_vbeln ). " custom SET method is executed
+
+  lr_handle->detach_commit( ).
+
+ENDFORM.
