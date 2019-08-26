@@ -1,0 +1,23 @@
+@AbapCatalog.sqlViewName: 'IMKT_DATYPE'
+@Analytics.dataCategory: #DIMENSION
+@Analytics.dataExtraction.enabled: true
+@VDM.viewType: #BASIC
+@AbapCatalog.compiler.compareFilter: true
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@ClientHandling.algorithm: #SESSION_VARIABLE
+@ObjectModel.usageType: {serviceQuality: #A, sizeCategory: #S, dataClass: #CUSTOMIZING}
+@ObjectModel.representativeKey: 'DigitalAccountType'
+@EndUserText.label: 'Digital Account Type'
+@Metadata.allowExtensions:true
+@Metadata.ignorePropagatedAnnotations:true
+define view I_MKT_DigitalAccountType
+as select from cuanc_da_type
+association [0..*] to I_MKT_DigitalAccountTypeText as _Text
+    on $projection.DigitalAccountType = _Text.DigitalAccountType
+{
+        @ObjectModel.text.association: '_Text'
+    key cuanc_da_type.da_type_id as DigitalAccountType,
+        cuanc_da_type.comm_medium as CommunicationMedium,
+
+        _Text
+}

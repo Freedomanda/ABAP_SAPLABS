@@ -1,0 +1,27 @@
+@AbapCatalog.sqlViewName: 'CUAN_DACNTCT_SL'
+@AbapCatalog.compiler.compareFilter: true
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Contact Smart Link for Digital Account'
+@ObjectModel.usageType: {serviceQuality: #X, sizeCategory: #XL, dataClass: #MIXED}
+
+define view CUAN_DGTLACCT_CONTACT_SMRTLNK
+as select from I_Mkt_Contact as _Mkt_Contact
+association [0..1] to I_Mkt_Interaction as _Mkt_Interaction
+    on _Mkt_Contact.LastChangeDateTime = _Mkt_Interaction.InteractionTimeStampUTC
+    and _Mkt_Contact.InteractionContact = _Mkt_Interaction.InteractionContact
+{
+    key _Mkt_Contact.PersonUUID as ContactKey,
+
+        _Mkt_Contact.LastChangeDateTime as LastInteractionTimestamp,
+        _Mkt_Contact.ImageURL as ContactImageURL,
+        _Mkt_Contact._MKT_ValidationStatus._Text[1: Language=$session.system_language].ValidationStatusName as ContactLevel,
+        _Mkt_Contact.IsConsumer as IsConsumer,
+        _Mkt_Contact.IsContactPerson as IsContact,
+        _Mkt_Contact._MKT_Gender._Text[1: Language=$session.system_language].GenderCodeName as ContactGender,
+        _Mkt_Contact.FullName as ContactName,
+        _Mkt_Interaction._MKT_InteractionType._Text[1: Language=$session.system_language].InteractionTypeName as LastInteractionType
+}
+where
+    _Mkt_Interaction.DigitalAccount != ''
+    and _Mkt_Interaction.DigitalAccountType != ''
+    and _Mkt_Contact.FullName != ''

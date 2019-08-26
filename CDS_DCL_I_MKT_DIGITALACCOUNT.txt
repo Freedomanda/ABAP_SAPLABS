@@ -1,0 +1,7 @@
+@EndUserText.label: 'Mapping role for I_MKT_DigitalAccount' 
+@MappingRole: true 
+define role I_Mkt_Digitalaccount { 
+    grant select on I_MKT_DigitalAccount
+        where (MarketingArea) = aspect pfcg_auth ( HPA_MKT_AR, MKTAREA_ID, actvt = '03' ) 
+        and( ) = aspect pfcg_auth ( HPA_OBJECT, HPA_OBJ = 'CUAN_DIGITAL_ACCOUNT', actvt = '03' ); 
+}

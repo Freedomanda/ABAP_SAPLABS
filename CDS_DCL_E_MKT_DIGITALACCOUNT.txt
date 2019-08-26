@@ -1,0 +1,12 @@
+@EndUserText.label: 'Auto assigned mapping role for E_MKT_DigitalAccount' 
+@MappingRole: true 
+define role E_MKT_DigitalAccount { 
+    grant 
+        select 
+            on 
+                E_MKT_DigitalAccount
+                    where 
+                       DigitalAccountUUID is null
+                  and  DigitalAccountUUID is not null;                        
+ 
+}

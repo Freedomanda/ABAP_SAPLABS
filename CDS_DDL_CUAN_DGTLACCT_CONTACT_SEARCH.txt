@@ -1,0 +1,45 @@
+@AbapCatalog.sqlViewName: 'CUAN_DAICSEARCH'
+@AbapCatalog.compiler.compareFilter: true
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@EndUserText.label: 'Contact Search for Digital Account'
+@ClientHandling.algorithm: #SESSION_VARIABLE
+@ObjectModel.usageType: {serviceQuality: #X, sizeCategory: #XL, dataClass: #MIXED}
+@Search.searchable
+
+define view cuan_dgtlacct_contact_search
+as select from cuand_da_root
+left outer join cuand_ce_mp_root
+    on cuand_da_root.comm_cat_key = cuand_ce_mp_root.comm_cat_key
+left outer join I_Mkt_Contact as _MKT_Contact
+    on cuand_ce_mp_root.contact_key = _MKT_Contact.InteractionContact
+{
+    key cuand_da_root.db_key as DigitalAccountUUID,
+    key cuand_ce_mp_root.contact_key as InteractionContactUUID,
+
+        cuand_da_root.comm_cat_key as CommunicationCategoryUUID,
+        cuand_da_root.mkt_area_id,
+        cuand_ce_mp_root.outbound_comm_medium as CommunicationMedium,
+        cuand_ce_mp_root.contact_facet_id as InteractionContactId,
+        cuand_ce_mp_root.contact_facet_id_origin as InteractionContactOrigin,
+
+        // Searchable Fields
+        @Search: { defaultSearchElement: true, ranking: #HIGH, fuzzinessThreshold: 0.8 }
+        _MKT_Contact.FullName,
+        @Search: { ranking: #LOW }
+        _MKT_Contact.CountryFreeText,
+        @Search: { ranking: #LOW }
+        _MKT_Contact.RegionFreeText,
+        @Search: { ranking: #LOW }
+        _MKT_Contact.CityName,
+        @Search: { ranking: #LOW }
+        _MKT_Contact.StreetName,
+        @Search: { ranking: #LOW }
+        _MKT_Contact.AddressHouseNumber,
+        @Search: { ranking: #LOW }
+        _MKT_Contact.EmailAddress,
+        @Search: { ranking: #LOW }
+        _MKT_Contact.MobileNumber
+}
+where
+        cuand_ce_mp_root.opt_in = 'Y'
+    and cuand_ce_mp_root.is_implicit = ''

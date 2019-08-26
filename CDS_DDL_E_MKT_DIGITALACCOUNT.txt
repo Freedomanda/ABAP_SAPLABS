@@ -1,0 +1,12 @@
+@AbapCatalog.sqlViewName: 'EMKTDIGACC'
+@AccessControl.authorizationCheck: #PRIVILEGED_ONLY
+@ClientHandling.algorithm: #AUTOMATED
+@EndUserText.label: 'Marketing: Digital Account'
+@VDM.viewType: #EXTENSION
+@ObjectModel.usageType: {serviceQuality: #A, sizeCategory: #XL, dataClass: #TRANSACTIONAL}
+
+define view E_MKT_DigitalAccount
+as select from cuand_da_root as Persistence
+{
+    key Persistence.db_key as DigitalAccountUUID
+}

@@ -1,0 +1,89 @@
+@AbapCatalog.sqlViewName: 'CMKT_DASUBSCRQ'
+@AbapCatalog.compiler.compareFilter: true
+@AccessControl.authorizationCheck: #PRIVILEGED_ONLY
+@OData.publish: true
+@Analytics.query: true
+@VDM.viewType: #CONSUMPTION
+@ClientHandling.algorithm: #SESSION_VARIABLE
+@ObjectModel.usageType: {serviceQuality: #D, sizeCategory: #XL, dataClass: #MIXED}
+@EndUserText.label: 'Acquisition of Digital Account Followers'
+
+define view C_MKT_DgtlAcctSubscrpnQ 
+with parameters
+    @Consumption.hidden: true //hidden from external consumers
+    @Environment.systemField: #SYSTEM_LANGUAGE //defaulting with logon language
+    P_Language : sylangu,  
+    @Environment.systemField: #SYSTEM_DATE
+    @AnalyticsDetails.query.variableSequence : 20  
+    P_EndDate : cuan_end_date,
+    @Consumption.derivation: { lookupEntity: 'I_MKT_CalculatedStartDateMonth', resultElement: 'StartDate', binding: [
+    { targetParameter: 'P_EvaluationTimeFrameInMonths' , type : #CONSTANT, value : '1' },  { targetParameter: 'P_EndDate' , type : #PARAMETER, value : 'P_EndDate' }  ] }  
+    @AnalyticsDetails.query.variableSequence : 10  
+    P_StartDate : cuan_start_date
+as select from I_MKT_DgtlAcctSubscrpnAggrgnC (P_EndDate: $parameters.P_EndDate, P_StartDate: $parameters.P_StartDate) as cube 
+{
+    // Row
+    @Semantics.text: true
+    @AnalyticsDetails.query.axis: #ROWS
+    cube.DigitalAccountName,
+    @AnalyticsDetails.query.axis: #ROWS
+    @AnalyticsDetails.query.totals: #SHOW
+    cube.InteractionUTCDate,
+    
+    // Interaction Contact
+    @Consumption.filter : { selectionType: #SINGLE, multipleSelections: true }
+    cube.Country,
+    @Semantics.text: true
+    cube._MKT_Country._Text[1: Language=$parameters.P_Language].CountryName,
+    @Consumption.filter : { selectionType: #SINGLE, multipleSelections: true }
+    cube.AddressRegion,
+    @Semantics.text: true
+    cube._MKT_Region._RegionText[1: Language=$parameters.P_Language].RegionName,
+    cube.CityName,
+    cube.StreetName,
+    cube.AddressHouseNumber,
+    cube.MobileNumber,
+    @Semantics.eMail: { address: true }
+    cube.EmailAddress,
+    @Consumption.filter : { selectionType: #SINGLE, multipleSelections: true }
+    cube.GenderCode,
+    @Semantics.text: true
+    cube._MKT_Gender._Text[1: Language=$parameters.P_Language].GenderCodeName,
+    @Consumption.filter : { selectionType: #SINGLE, multipleSelections: true }
+    cube.ItemOfInterest,
+    @Semantics.text: true
+    cube._MKT_Interest._Text[1: Language=$parameters.P_Language].ItemOfInterestName,
+    @AnalyticsDetails.query.totals: #SHOW
+    cube.FullName,
+    
+    // Digital Account
+    cube.DigitalAccountUUID,
+    @Consumption.filter : { selectionType: #SINGLE, multipleSelections: true }
+    cube.DigitalAccount,
+    @Consumption.filter : { selectionType: #SINGLE, multipleSelections: true }
+    cube.DigitalAccountType,
+    @Semantics.text: true
+    cube._MKT_DigitalAccountType._Text[1: Language=$parameters.P_Language].DigitalAccountTypeName,
+    @Consumption.filter : { selectionType: #SINGLE, multipleSelections: true }
+    cube.MarketingArea,
+    @Semantics.text: true
+    cube._MKT_MarketingArea._Text[1: Language=$parameters.P_Language].MarketingAreaName,
+    
+    // Time
+    @Semantics.calendar.yearWeek: true
+    cube.YearWeek,
+    @Semantics.calendar.yearMonth: true
+    cube.YearMonth,
+    @Semantics.calendar.yearQuarter: true
+    cube.YearQuarter,
+    @Semantics.calendar.year: true
+    cube.CalendarYear,
+    
+    // Measures
+    @DefaultAggregation: #SUM
+    cast(cube.NumberOfFollowers as cuan_numberoffollowers) as NumberOfFollowers,
+    @DefaultAggregation: #SUM
+    cast(cube.NumberOfUnfollowers as cuan_numberofunfollowers) as NumberOfUnfollowers,
+    @AnalyticsDetails.query.axis: #ROWS
+    cast(cube.NumberOfFollowers - cube.NumberOfUnfollowers as cuan_netnumberoffollowers) as NetNumberOfFollowers
+}

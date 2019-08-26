@@ -1,0 +1,99 @@
+@AbapCatalog.sqlViewName: 'CMKT_DAIAQ'
+@AbapCatalog.compiler.compareFilter: true
+@AccessControl.authorizationCheck: #PRIVILEGED_ONLY
+@OData.publish: true
+@Analytics.query: true
+@VDM.viewType: #CONSUMPTION
+@ClientHandling.algorithm: #SESSION_VARIABLE
+@ObjectModel.usageType: {serviceQuality: #D, sizeCategory: #XL, dataClass: #MIXED}
+@EndUserText.label: 'Interactions of Digital Account'
+
+define view C_MKT_DgtlAcctIntactnQ 
+with parameters
+    @Consumption.hidden: true //hidden from external consumers
+    @Environment.systemField: #SYSTEM_LANGUAGE //defaulting with logon language
+    P_Language : sylangu,  
+    @Environment.systemField: #SYSTEM_DATE
+    @AnalyticsDetails.query.variableSequence : 20  
+    P_EndDate : cuan_end_date,
+    @Consumption.derivation: { lookupEntity: 'I_MKT_CalculatedStartDateMonth', resultElement: 'StartDate', binding: [
+    { targetParameter: 'P_EvaluationTimeFrameInMonths' , type : #CONSTANT, value : '1' },  { targetParameter: 'P_EndDate' , type : #PARAMETER, value : 'P_EndDate' }  ] }  
+    @AnalyticsDetails.query.variableSequence : 10  
+    P_StartDate : cuan_start_date
+as select from I_MKT_DgtlAcctIntactnAggrgnC ( P_EndDate: $parameters.P_EndDate, P_StartDate: $parameters.P_StartDate ) as cube
+{    
+    // Row
+    @Semantics.text: true
+    @AnalyticsDetails.query.axis: #ROWS
+    cube.DigitalAccountName,
+    @Consumption.filter : { selectionType: #INTERVAL, multipleSelections: true }
+    @AnalyticsDetails.query.axis: #ROWS
+    @AnalyticsDetails.query.totals: #SHOW
+    cube.InteractionUTCDate,
+    @Semantics.text: true   
+    @AnalyticsDetails.query.axis: #ROWS
+    @AnalyticsDetails.query.totals: #SHOW
+    cube._MKT_InteractionType._Text[ 1: Language=$parameters.P_Language ].InteractionTypeName,
+    
+    // Interaction
+    cube.InteractionType,
+    @Consumption.filter : { selectionType: #SINGLE, multipleSelections: true }
+    cube.ItemOfInterest,
+    @Semantics.text: true
+    cube._MKT_Interest._Text[ 1: Language=$parameters.P_Language ].ItemOfInterestName,
+    
+    // Interaction Contact
+    @Consumption.filter : { selectionType: #SINGLE, multipleSelections: true }
+    cube.Country,
+    @Semantics.text: true
+    cube._MKT_Country._Text[ 1: Language=$parameters.P_Language ].CountryName,
+    @Consumption.filter : { selectionType: #SINGLE, multipleSelections: true }
+    cube.AddressRegion,
+    @Semantics.text: true
+    cube._MKT_Region._RegionText[ 1: Language=$parameters.P_Language ].RegionName,
+    cube.CityName,
+    cube.StreetName,
+    cube.AddressHouseNumber,
+    cube.MobileNumber,
+    @Semantics.eMail: { address: true }
+    cube.EmailAddress,
+    @Consumption.filter : { selectionType: #SINGLE, multipleSelections: true }
+    cube.GenderCode,
+    @Semantics.text: true
+    cube._MKT_Gender._Text[ 1: Language=$parameters.P_Language ].GenderCodeName,
+    @AnalyticsDetails.query.totals: #SHOW
+    cube.FullName,
+    
+    // Digital Account
+    cube.DigitalAccountUUID,
+    @Consumption.filter : { selectionType: #SINGLE, multipleSelections: true }
+    cube.DigitalAccount,
+    @Consumption.filter : { selectionType: #SINGLE, multipleSelections: true }
+    cube.DigitalAccountType,
+    @Semantics.text: true
+    cube._MKT_DigitalAccountType._Text[ 1: Language=$parameters.P_Language ].DigitalAccountTypeName,
+    @Consumption.filter : { selectionType: #SINGLE, multipleSelections: true }
+    cube.MarketingArea,
+    @Semantics.text: true
+    cube._MKT_MarketingArea._Text[ 1: Language=$parameters.P_Language ].MarketingAreaName,
+    
+    // Time
+    @Semantics.calendar.yearWeek: true
+    cube.YearWeek,
+    @Semantics.calendar.yearMonth: true
+    cube.YearMonth,
+    @Semantics.calendar.yearQuarter: true
+    cube.YearQuarter,
+    @Semantics.calendar.year: true
+    cube.CalendarYear,
+
+    // Measures
+    @DefaultAggregation: #SUM
+    cast( cube.NumberOfInteractions as cuan_dgtlacct_noofinteractions ) as NumberOfInteractions,
+    @AnalyticsDetails.exceptionAggregationSteps.exceptionAggregationBehavior: #COUNT
+    @AnalyticsDetails.exceptionAggregationSteps.exceptionAggregationElements: ['InteractionContact']
+//    1 as NumberOfInteractionContacts
+    cast (1 as cuan_dgtlacct_numberofcontacts) as NumberOfInteractionContacts
+//    cast ( cast( 1 as abap.int4(10) ) as cuan_dgtlacct_numberofcontacts ) as NumberOfInteractionContacts
+//    cast( cube.NumberOfInteractionContacts as cuan_dgtlacct_numberofcontacts ) as NumberOfInteractionContacts
+}

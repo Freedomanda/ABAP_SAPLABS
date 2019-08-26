@@ -1,0 +1,38 @@
+@AbapCatalog.sqlViewName: 'IMKTDIGACC'
+@AbapCatalog.compiler.compareFilter: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Marketing: Digital Account'
+@Analytics.dataExtraction.enabled: true
+@VDM.viewType: #BASIC
+@Analytics.dataCategory: #DIMENSION
+@ClientHandling.algorithm: #SESSION_VARIABLE
+@ObjectModel.usageType: {serviceQuality: #A, sizeCategory: #S, dataClass: #TRANSACTIONAL}
+@ObjectModel.representativeKey: 'DigitalAccountUUID'
+@Metadata.ignorePropagatedAnnotations:true
+@Metadata.allowExtensions:true
+define view I_MKT_DigitalAccount
+as select from cuand_da_root
+association [1..1] to E_MKT_DigitalAccount as _Extension
+    on cuand_da_root.db_key = _Extension.DigitalAccountUUID
+association [0..1] to I_MKT_DigitalAccountType as _MKT_DigitalAccountType
+    on $projection.DigitalAccountType = _MKT_DigitalAccountType.DigitalAccountType
+association [0..1] to I_MKT_MarketingArea as _MKT_MarketingArea
+    on $projection.MarketingArea = _MKT_MarketingArea.MarketingArea
+{
+    key cast(bintohex(cuand_da_root.db_key) as cuan_cds_digital_account) as DigitalAccountUUID,
+        cuand_da_root.comm_cat_key        as CommunicationCategoryUUID,
+        cuand_da_root.digacc_id           as DigitalAccount,
+        @Semantics.text: true
+        cuand_da_root.digacc_name         as DigitalAccountName,
+        @ObjectModel.foreignKey.association: '_MKT_DigitalAccountType'
+        cuand_da_root.digacc_type         as DigitalAccountType,
+        cuand_da_root.digacc_desc         as DigitalAccountDescription,
+        cuand_da_root.status              as DigitalAccountStatus,
+        cuand_da_root.crea_uname          as CreatedByUser,
+        @ObjectModel.foreignKey.association: '_MKT_MarketingArea'
+        cuand_da_root.mkt_area_id         as MarketingArea,
+        cuand_da_root.smtp_addr           as EmailAddress,
+
+        _MKT_DigitalAccountType,
+        _MKT_MarketingArea
+}

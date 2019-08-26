@@ -1,0 +1,20 @@
+@AbapCatalog.sqlViewName: 'IMKT_DATYPET'
+@AbapCatalog.compiler.compareFilter: true
+@AccessControl.authorizationCheck: #NOT_REQUIRED
+@ObjectModel.dataCategory: #TEXT
+@Analytics.dataExtraction.enabled: true
+@VDM.viewType: #BASIC
+@ClientHandling.algorithm: #SESSION_VARIABLE
+@ObjectModel.representativeKey: 'DigitalAccountType'
+@ObjectModel.usageType: {serviceQuality: #A, sizeCategory: #S, dataClass: #CUSTOMIZING}
+@EndUserText.label: 'Text of Digital Account Type'
+@Metadata.ignorePropagatedAnnotations:true
+define view I_MKT_DigitalAccountTypeText
+as select from cuanc_da_type_t
+{
+        @Semantics.language: true
+    key cuanc_da_type_t.spras as Language,
+    key cuanc_da_type_t.da_type_id as DigitalAccountType,
+        @Semantics.text: true
+        cuanc_da_type_t.da_type_desc as DigitalAccountTypeName
+}

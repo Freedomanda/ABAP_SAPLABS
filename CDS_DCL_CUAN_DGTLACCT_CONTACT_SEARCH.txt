@@ -1,0 +1,7 @@
+@EndUserText.label: 'Mapping role for CUAN_DGTLACCT_CONTACT_SEARCH' 
+@MappingRole: true 
+define role CUAN_DGTLACCT_CONTACT_SEARCH { 
+    grant select on CUAN_DGTLACCT_CONTACT_SEARCH 
+        where ( ) = aspect pfcg_auth (  HPA_OBJECT, HPA_OBJ = 'CUAN_DIGITAL_ACCOUNT', actvt = '03' )
+        and ( MKT_AREA_ID ) = aspect pfcg_auth (  HPA_MKT_AR, MKTAREA_ID,  HPA_OBJ = 'CUAN_DIGITAL_ACCOUNT', actvt = '03' );
+}
